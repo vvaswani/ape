@@ -1,1 +1,13 @@
-Welcome to the APE - your Automated Portfolio Evaluator!
+# A.P.E aka Automated Portfolio Evaluator!
+
+Meet APE - your new AI-native portfolio advisor!
+
+## Start
+
+- `export GOOGLE_GENERATIVE_AI_API_KEY=...` # or `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
+- `docker compose up`
+- Browse to `http://localhost:4321`
+
+## Contributing
+
+- This repository follows the Conventional Commits Specification for commits and pull requests.

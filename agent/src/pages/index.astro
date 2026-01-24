@@ -1,11 +1,56 @@
 ---
-import Welcome from '../components/Welcome.astro';
 import Layout from '../layouts/Layout.astro';
-
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+import AgentInput from '../components/AgentInput.astro';
+import AgentResponse from '../components/AgentResponse.astro';
 ---
 
 <Layout>
-	<Welcome />
+  <div class="container">
+    <h1>Talk to the APE!</h1>
+
+    <AgentInput />
+    <AgentResponse />
+  </div>
 </Layout>
+
+<script is:inline>
+  document.addEventListener("DOMContentLoaded", () => {
+    const form = document.querySelector("form");
+    const input = document.querySelector("input[name='text']");
+    const responsePara = document.querySelector(".response p");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const prompt = input.value.trim();
+      if (!prompt) return;
+
+      responsePara.textContent = "Thinking...";
+
+      try {
+        const res = await fetch("/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ input: prompt }),
+        });
+        const data = await res.json();
+        responsePara.textContent = data.response;
+      } catch (err) {
+        responsePara.textContent = "Error getting response";
+      }
+
+      input.value = "";
+    });
+  });
+</script>
+
+<style>
+  .container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  h1 {
+    margin-bottom: 1.5rem;
+  }
+</style>
