@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@mastra/core": "^1.0.4",
-    "astro": "^5.16.15",
-    "mastra": "^1.0.1"
+    "astro": "^5.16.15"
   }
 }
