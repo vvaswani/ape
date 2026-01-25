@@ -1,1 +1,34 @@
+# dependencies
 node_modules
+.bun
+.pnpm-store
+.yarn
+.yarn-cache
+
+# next.js build output
+.next
+out
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun-debug.log*
+bun-error.log*
+
+# env files
+.env
+.env.*
+!.env.example
+
+.vscode
+
+# git
+.git
+.gitignore
+
+# tests & coverage
+coverage
+__tests__
+*.test.*
+*.spec.*

@@ -1,17 +1,19 @@
 version: "3.9"
 
 services:
-  astro:
-    container_name: ape-agent-dev
+  agent:
+    container_name: ape-agent
     build:
       context: agent
       dockerfile: Dockerfile
     ports:
-      - "4321:4321"
+      - "3000:3000"
     volumes:
       - ./agent:/app
     environment:
       NODE_ENV: development
+      NEXT_DISABLE_EDGE_RUNTIME: "1"
+      NEXT_TELEMETRY_DISABLED: "1"
       GOOGLE_GENERATIVE_AI_API_KEY: ${GOOGLE_GENERATIVE_AI_API_KEY}
 
-    command: bun run dev -- --host
+    command: bun run dev

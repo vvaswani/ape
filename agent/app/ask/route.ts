@@ -1,8 +1,8 @@
-import type { APIRoute } from "astro";
+import { NextResponse } from "next/server";
 import { Mastra } from "@mastra/core/mastra";
 import { Agent } from "@mastra/core/agent";
 
-export const prerender = false;
+export const runtime = "nodejs";
 
 const apeAgent = new Agent({
   id: "ape-agent",
@@ -13,7 +13,7 @@ const apeAgent = new Agent({
     rebalancing, risk management, or investing strategies.
     Provide concise, helpful, and actionable advice.
   `,
-  model:"google/gemini-2.5-flash", // or replace with another supported model
+  model: "google/gemini-2.5-flash",
 });
 
 const mastra = new Mastra({
@@ -22,29 +22,21 @@ const mastra = new Mastra({
   },
 });
 
-export const POST: APIRoute = async ({ request }) => {
+export async function POST(req: Request) {
   try {
-    const { input } = await request.json();
+    const { input } = await req.json();
 
-    // Get the Mastra agent
     const agent = mastra.getAgent("apeAgent");
-
-    // Generate a response
     const result = await agent.generate([
       { role: "user", content: input },
     ]);
 
-    const text = result.text;
-
-    return new Response(
-      JSON.stringify({ response: text }),
-      { status: 200 }
-    );
+    return NextResponse.json({ response: result.text });
   } catch (err) {
     console.error(err);
-    return new Response(
-      JSON.stringify({ error: "failed to generate" }),
+    return NextResponse.json(
+      { error: "failed to generate" },
       { status: 500 }
     );
   }
-};
+}

@@ -1,4 +1,4 @@
-FROM oven/bun:1.1.8-alpine
+FROM oven/bun:1.3.4-alpine
 
 WORKDIR /app
 
@@ -8,6 +8,6 @@ RUN bun install
 
 COPY . .
 
-EXPOSE 4321
+EXPOSE 3000
 
-CMD ["bun", "run", "dev", "--", "--host"]
+CMD ["bun", "run", "dev"]
