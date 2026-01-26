@@ -1,58 +1,56 @@
+/**
+ * @file components/AgentInput.tsx
+ *
+ * ## Purpose
+ * Input control for the APE chat UI.
+ *
+ * This component is intentionally "dumb":
+ * - no network calls
+ * - no global events
+ * - delegates submit to parent via callback
+ */
+
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useCallback, useState } from "react";
 
-export default function AgentInput() {
-  const [text, setText] = useState("");
-  const [loading, setLoading] = useState(false);
+export type AgentInputProps = {
+  /**
+   * Called when the user submits non-empty input.
+   */
+  onSubmit: (input: string) => void;
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!text.trim()) return;
+  /**
+   * Disables the input and button (e.g., while waiting for response).
+   */
+  disabled?: boolean;
+};
 
-    setLoading(true);
-    window.dispatchEvent(
-      new CustomEvent("agent:thinking", { detail: true })
-    );
+export default function AgentInput({ onSubmit, disabled = false }: AgentInputProps) {
+  const [input, setInput] = useState("");
 
-    try {
-      const res = await fetch("/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: text }),
-      });
-
-      const data = await res.json();
-
-      window.dispatchEvent(
-        new CustomEvent("agent:response", {
-          detail: data.response ?? "No response",
-        })
-      );
-    } catch {
-      window.dispatchEvent(
-        new CustomEvent("agent:response", {
-          detail: "Error getting response",
-        })
-      );
-    } finally {
-      setLoading(false);
-      setText("");
-    }
-  }
+  const submit = useCallback(() => {
+    const text = input.trim();
+    if (!text || disabled) return;
+    onSubmit(text);
+    setInput("");
+  }, [input, disabled, onSubmit]);
 
   return (
-    <form onSubmit={onSubmit}>
+    <div className="agent-input">
       <input
         type="text"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
+        value={input}
         placeholder="Type your message..."
-        required
+        onChange={(e) => setInput(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") submit();
+        }}
+        disabled={disabled}
       />
-      <button type="submit" disabled={loading}>
-        {loading ? "Thinking..." : "Send"}
+      <button onClick={submit} disabled={disabled}>
+        Send
       </button>
-    </form>
+    </div>
   );
 }

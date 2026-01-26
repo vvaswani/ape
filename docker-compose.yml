@@ -10,10 +10,12 @@ services:
       - "3000:3000"
     volumes:
       - ./agent:/app
+      - /app/node_modules
     environment:
       NODE_ENV: development
       NEXT_DISABLE_EDGE_RUNTIME: "1"
       NEXT_TELEMETRY_DISABLED: "1"
       GOOGLE_GENERATIVE_AI_API_KEY: ${GOOGLE_GENERATIVE_AI_API_KEY}
+    # command: bun run dev
+    command: sh -c "bun install && bun run dev"
 
-    command: bun run dev
