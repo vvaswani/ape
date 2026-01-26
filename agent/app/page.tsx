@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * @file app/page.tsx
  *
@@ -96,18 +98,25 @@ export default function Page() {
   }, [isThinking, messages]);
 
   return (
-    <main className="container">
-      <h1>Talk to the APE!</h1>
+    <main className="app">
+      <header className="app__header">
+        <h1 className="app__brand">APE</h1>
+        <div className="app__subtitle">Automated Portfolio Evaluator (dev)</div>
+      </header>
 
-      <AgentInput onSubmit={submit} disabled={isThinking} />
+      <section className="card">
+        <AgentResponse
+          messages={messages}
+          isThinking={isThinking}
+          error={error}
+          onClear={clear}
+          lastAssistantMessage={lastAssistantMessage}
+        />
 
-      <AgentResponse
-        messages={messages}
-        isThinking={isThinking}
-        error={error}
-        onClear={clear}
-        lastAssistantMessage={lastAssistantMessage}
-      />
+        <div className="divider" />
+
+        <AgentInput onSubmit={submit} disabled={isThinking} />
+      </section>
     </main>
   );
 }

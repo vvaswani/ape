@@ -37,18 +37,17 @@ export default function AgentInput({ onSubmit, disabled = false }: AgentInputPro
   }, [input, disabled, onSubmit]);
 
   return (
-    <div className="agent-input">
+    <div className="composer">
       <input
+        className="composer__input"
         type="text"
         value={input}
-        placeholder="Type your message..."
+        placeholder="Ask about allocation, rebalancing, risk, goals…"
         onChange={(e) => setInput(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") submit();
-        }}
+        onKeyDown={(e) => e.key === "Enter" && submit()}
         disabled={disabled}
       />
-      <button onClick={submit} disabled={disabled}>
+      <button className="btn btn--primary" onClick={submit} disabled={disabled}>
         Send
       </button>
     </div>

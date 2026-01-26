@@ -29,42 +29,37 @@ export default function AgentResponse({
   lastAssistantMessage,
 }: AgentResponseProps) {
   return (
-    <div className="agent-response">
-      <div className="agent-response__actions" style={{ display: "flex", gap: 8 }}>
-        <button onClick={onClear} disabled={isThinking && messages.length === 0}>
-          Clear
-        </button>
-
-        <button
-          onClick={() => {
-            if (!lastAssistantMessage) return;
-            navigator.clipboard.writeText(lastAssistantMessage);
-          }}
-          disabled={!lastAssistantMessage}
-        >
-          Copy last answer
-        </button>
+    <div className="chat">
+      <div className="chat__topbar">
+        <div className="chat__hint">Dev chat</div>
+        <div className="chat__actions">
+          <button className="btn btn--ghost" onClick={onClear}>Clear</button>
+          <button
+            className="btn btn--ghost"
+            onClick={() => lastAssistantMessage && navigator.clipboard.writeText(lastAssistantMessage)}
+            disabled={!lastAssistantMessage}
+          >
+            Copy last
+          </button>
+        </div>
       </div>
 
-      {error && (
-        <div className="agent-response__error" style={{ marginTop: 12 }}>
-          <strong>Error:</strong> {error}
-        </div>
-      )}
+      {error && <div className="chat__error">Error: {error}</div>}
 
-      {isThinking && (
-        <div className="agent-response__thinking" style={{ marginTop: 12 }}>
-          Thinking...
-        </div>
-      )}
-
-      <div className="agent-response__messages" style={{ marginTop: 12, display: "grid", gap: 12 }}>
+      <div className="chat__scroll">
         {messages.map((m, i) => (
-          <div key={i} className="agent-message" style={{ border: "1px solid #ddd", padding: 12 }}>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>{m.role.toUpperCase()}</div>
-            <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div>
+          <div key={i} className={`msg ${m.role === "user" ? "msg--user" : "msg--assistant"}`}>
+            <div className="msg__meta">{m.role === "user" ? "You" : "APE"}</div>
+            <div className="msg__bubble">{m.content}</div>
           </div>
         ))}
+
+        {isThinking && (
+          <div className="msg msg--assistant">
+            <div className="msg__meta">APE</div>
+            <div className="msg__bubble msg__bubble--thinking">Thinking…</div>
+          </div>
+        )}
       </div>
     </div>
   );
