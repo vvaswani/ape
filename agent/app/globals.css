@@ -267,6 +267,36 @@ body {
   justify-content: flex-end;
 }
 
+/* Markdown typography inside chat bubbles */
+.msg__bubble :is(p) { margin: 0; }
+.msg__bubble :is(p + p) { margin-top: 10px; }
+
+.msg__bubble :is(ul, ol) { margin: 8px 0 0; padding-left: 18px; }
+.msg__bubble :is(li) { margin: 4px 0; }
+
+.msg__bubble :is(code) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.95em;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.55);
+}
+
+.msg__bubble pre {
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(2, 6, 23, 0.55);
+}
+
+.msg__bubble pre code {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
 
 /* ==========================================================================
    Notes

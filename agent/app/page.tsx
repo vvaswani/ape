@@ -100,8 +100,8 @@ export default function Page() {
   return (
     <main className="app">
       <header className="app__header">
-        <h1 className="app__brand">APE</h1>
-        <div className="app__subtitle">Automated Portfolio Evaluator (dev)</div>
+        <h1 className="app__brand">Automated Portfolio Evaluator [DEV]</h1>
+        <div className="app__subtitle">AI-assisted portfolio guidance with auditable, deterministic workflows.</div>
       </header>
 
       <section className="card">

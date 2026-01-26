@@ -12,6 +12,7 @@
 "use client";
 
 import type { UiChatMessage } from "@/app/page";
+import ReactMarkdown from "react-markdown";
 
 export type AgentResponseProps = {
   messages: UiChatMessage[];
@@ -50,7 +51,9 @@ export default function AgentResponse({
         {messages.map((m, i) => (
           <div key={i} className={`msg ${m.role === "user" ? "msg--user" : "msg--assistant"}`}>
             <div className="msg__meta">{m.role === "user" ? "You" : "APE"}</div>
-            <div className="msg__bubble">{m.content}</div>
+            <div className="msg__bubble">
+              <ReactMarkdown>{m.content}</ReactMarkdown>
+            </div>
           </div>
         ))}
 
