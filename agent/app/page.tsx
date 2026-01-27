@@ -1,122 +1,80 @@
 "use client";
 
 /**
- * @file app/page.tsx
- *
- * ## Purpose
- * Main UI for interacting with the APE agent in dev mode.
- *
- * Responsibilities:
- * - holds chat message state
- * - passes messages and callbacks to child components
- * - keeps the page composition minimal
+ * @file page.tsx
+ * @description
+ * Main UI container for Milestone #1.
+ * Owns chat state and calls the API route.
  */
 
-import { useCallback, useMemo, useState } from "react";
-import AgentInput from "@/components/AgentInput";
-import AgentResponse from "@/components/AgentResponse";
-
-/**
- * Permitted roles for chat messages shown in the UI.
- */
-type ChatRole = "user" | "assistant";
-
-/**
- * Message shape used by the UI.
- */
-export type UiChatMessage = {
-  role: ChatRole;
-  content: string;
-};
+import { useCallback, useState } from "react";
+import ChatComposer from "@/components/ChatComposer";
+import ChatThread from "@/components/ChatThread";
+import ResponsePanel from "@/components/ResponsePanel";
+import type { ChatMessage, ChatRequest, ChatResponse } from "@/lib/domain/chat";
 
 export default function Page() {
-  const [messages, setMessages] = useState<UiChatMessage[]>([]);
-  const [isThinking, setIsThinking] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      role: "assistant",
+      content:
+        "Hi — I’m the AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator). Tell me what you’re trying to decide and what you know (targets, current weights, cash flows).",
+    },
+  ]);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const lastAssistantMessage = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-      if (messages[i]?.role === "assistant") return messages[i]?.content ?? "";
-    }
-    return "";
-  }, [messages]);
-
-  /**
-   * Clears all chat history from the UI.
-   */
-  const clear = useCallback(() => {
-    setMessages([]);
+  const onSend = useCallback(async (text: string) => {
     setError(null);
-    setIsThinking(false);
-  }, []);
+    setIsLoading(true);
 
-  /**
-   * Submits a user message to the backend and appends the assistant response.
-   *
-   * @param inputRaw user-entered text
-   */
-  const submit = useCallback(async (inputRaw: string) => {
-    const input = inputRaw.trim();
-    if (!input || isThinking) return;
+    const nextMessages: ChatMessage[] = [...messages, { role: "user", content: text }];
 
-    setError(null);
-    setIsThinking(true);
-
-    // Append the user message immediately for responsiveness
-    const nextMessages: UiChatMessage[] = [...messages, { role: "user", content: input }];
+    // Optimistic update: show user message immediately.
     setMessages(nextMessages);
 
     try {
-      const res = await fetch("/ask", {
+      const payload: ChatRequest = { messages: nextMessages };
+
+      const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Send full history to enable multi-turn context
-        body: JSON.stringify({
-          messages: nextMessages.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-        }),
+        body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
 
-      if (!res.ok) {
-        const details = typeof data?.details === "string" ? data.details : "";
-        const errMsg =
-          typeof data?.error === "string" ? data.error : "Request failed";
-        throw new Error(details ? `${errMsg}: ${details}` : errMsg);
-      }
+      const data = (await res.json()) as ChatResponse;
 
-      const responseText = typeof data?.response === "string" ? data.response : "";
-      setMessages([...nextMessages, { role: "assistant", content: responseText }]);
-    } catch (e: any) {
-      setError(e?.message ?? String(e));
+      setMessages((prev) => [...prev, { role: "assistant", content: data.assistant.content }]);
+    } catch (e) {
+      console.error(e);
+      setError("Something went wrong. Check server logs and your API key.");
     } finally {
-      setIsThinking(false);
+      setIsLoading(false);
     }
-  }, [isThinking, messages]);
+  }, [messages]);
 
   return (
     <main className="app">
       <header className="app__header">
-        <h1 className="app__brand">Automated Portfolio Evaluator [DEV]</h1>
-        <div className="app__subtitle">AI-assisted portfolio guidance with auditable, deterministic workflows.</div>
+        <div className="app__brand">AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator)</div>
+        <div className="app__subtitle">Policy-driven portfolio decision support with an audit trail (Milestone #1)</div>
       </header>
 
-      <section className="card">
-        <AgentResponse
-          messages={messages}
-          isThinking={isThinking}
-          error={error}
-          onClear={clear}
-          lastAssistantMessage={lastAssistantMessage}
-        />
+      <div className="card">
+        <div className="chat">
+          <div className="chat__topbar">
+            <div className="chat__hint">Multi-turn chat. No trade execution. No market timing.</div>
+          </div>
+
+          <ChatThread messages={messages} />
+          <ResponsePanel isLoading={isLoading} error={error} />
+        </div>
 
         <div className="divider" />
-
-        <AgentInput onSubmit={submit} disabled={isThinking} />
-      </section>
+        <ChatComposer onSend={onSend} disabled={isLoading} />
+      </div>
     </main>
   );
 }
