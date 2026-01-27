@@ -20,6 +20,9 @@ import DecisionPanel from "@/components/DecisionPanel";
 import type { ChatMessage, ChatRequest } from "@/lib/domain/chat";
 import type { DecisionSnapshot } from "@/lib/domain/decisionSnapshot";
 
+import PortfolioStateForm from "@/components/PortfolioStateForm";
+import type { PortfolioStateInput } from "@/lib/domain/portfolioState";
+
 export default function Page() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -33,6 +36,13 @@ export default function Page() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [portfolioState, setPortfolioState] = useState<PortfolioStateInput>({
+    as_of_date: new Date().toISOString().slice(0, 10),
+    total_value_gbp: null,
+    weights: { EQUITIES: 0.63, BONDS: 0.27, CASH: 0.1 },
+    cash_flows: { pending_contributions_gbp: 2000, pending_withdrawals_gbp: null },
+  });
+
   const onSend = useCallback(
     async (text: string) => {
       setError(null);
@@ -43,7 +53,7 @@ export default function Page() {
       setMessages(nextMessages);
 
       try {
-        const payload: ChatRequest = { messages: nextMessages };
+        const payload: ChatRequest = { messages: nextMessages, portfolio_state: portfolioState };
 
         const res = await fetch("/api/chat", {
           method: "POST",
@@ -97,6 +107,7 @@ export default function Page() {
             </div>
           </div>
 
+          <PortfolioStateForm value={portfolioState} onChange={setPortfolioState} />
           <ChatThread messages={messages} />
           <ResponsePanel isLoading={isLoading} error={error} />
 
