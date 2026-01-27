@@ -1,0 +1,122 @@
+{
+  "snapshot_id": "00000000-0000-0000-0000-000000000000",
+  "snapshot_version": "0.1-default",
+  "created_at": "2026-01-27T00:00:00Z",
+
+  "project": "AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator)",
+
+  "context": {
+    "user_id": "default",
+    "environment": "default",
+    "jurisdiction": "UK",
+    "base_currency": "GBP"
+  },
+
+  "inputs": {
+    "portfolio_state": {
+      "total_value": 100000,
+      "asset_allocation": {
+        "EQUITIES": 0.60,
+        "BONDS": 0.35,
+        "CASH": 0.05
+      },
+      "positions_summary": "Aggregated multi-asset portfolio",
+      "cash_balance": 5000
+    },
+
+    "cash_flows": {
+      "pending_contributions": 0,
+      "pending_withdrawals": 0,
+      "notes": "No known near-term flows"
+    },
+
+    "constraints": {
+      "liquidity_needs": "Standard",
+      "tax_or_wrapper_constraints": "None material",
+      "other_constraints": "None"
+    },
+
+    "market_context": {
+      "as_of_date": "2026-01-27",
+      "notes": "No exceptional market conditions considered"
+    }
+  },
+
+  "governance": {
+    "investment_policy": {
+      "policy_id": "ape-policy",
+      "policy_version": "0.1-default",
+      "policy_source": "default"
+    },
+    "explanation_contract": {
+      "version": "0.1-default"
+    }
+  },
+
+  "evaluation": {
+    "drift_analysis": {
+      "target_weights": {
+        "EQUITIES": 0.60,
+        "BONDS": 0.35,
+        "CASH": 0.05
+      },
+      "actual_weights": {
+        "EQUITIES": 0.60,
+        "BONDS": 0.35,
+        "CASH": 0.05
+      },
+      "absolute_drift": {
+        "EQUITIES": 0.00,
+        "BONDS": 0.00,
+        "CASH": 0.00
+      },
+      "bands_breached": false
+    },
+
+    "risk_checks": {
+      "drawdown_proximity": "Not applicable",
+      "risk_capacity_breached": false,
+      "notes": "Portfolio within policy risk limits"
+    }
+  },
+
+  "recommendation": {
+    "type": "DO_NOTHING",
+    "summary": "Portfolio allocations are within policy targets and rebalancing bands.",
+
+    "proposed_actions": [],
+
+    "turnover_estimate": {
+      "gross_turnover_pct": 0.0,
+      "trade_count": 0
+    }
+  },
+
+  "explanation": {
+    "decision_summary": "No portfolio action is recommended at this time.",
+    "relevant_portfolio_state": "Current allocations match target weights across all asset classes.",
+    "policy_basis": "Policy 0.1-default target weights and rebalancing bands were applied.",
+    "reasoning_and_tradeoffs": "Rebalancing is not justified because risk exposure is aligned with policy and any action would introduce unnecessary turnover.",
+    "uncertainty_and_confidence": "Confidence is high given the absence of drift or constraint changes. No material uncertainty identified.",
+    "next_review_or_trigger": "Review at the next scheduled monthly check or upon a material change in portfolio or constraints."
+  },
+
+  "user_acknowledgement": {
+    "decision": "DEFER",
+    "user_notes": "Default snapshot – no action taken.",
+    "acknowledged_at": null
+  },
+
+  "outcome": {
+    "implemented": null,
+    "implementation_notes": null,
+    "review_date": null,
+    "observed_effects": null
+  },
+
+  "audit": {
+    "logic_version": "0.1",
+    "notes": "Baseline default decision snapshot for system validation."
+  }
+}
+

@@ -1,0 +1,74 @@
+{
+  "policy_id": "ape-policy",
+  "policy_name": "AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator) Policy",
+  "policy_version": "0.1-default",
+  "source": "default",
+  "jurisdiction": "UK",
+  "owner": "Default",
+  "updated_at": "2026-01-27",
+
+  "strategic_asset_allocation": {
+    "base_currency": "GBP",
+    "asset_classes": [
+      "EQUITIES",
+      "BONDS",
+      "CASH"
+    ],
+    "target_weights": {
+      "EQUITIES": 0.60,
+      "BONDS": 0.35,
+      "CASH": 0.05
+    }
+  },
+
+  "risk_guardrails": {
+    "max_rolling_12m_drawdown_pct": 0.20,
+    "risk_capacity_rule": "RISK_CAPACITY_OVERRIDES_TOLERANCE"
+  },
+
+  "rebalancing_policy": {
+    "trigger_type": "BAND_ABSOLUTE",
+    "absolute_bands": {
+      "EQUITIES": 0.07,
+      "BONDS": 0.06,
+      "CASH": 0.03
+    },
+    "review_cadence": {
+      "light_check": "MONTHLY",
+      "formal_review": "QUARTERLY"
+    },
+    "execution_preferences": {
+      "use_contributions_first": true,
+      "sell_only_if_required": true,
+      "avoid_micro_trades": true
+    }
+  },
+
+  "turnover_controls": {
+    "min_trade_gbp": 500,
+    "min_trade_pct_of_portfolio": 0.005,
+    "notes": "Fail-safe defaults to avoid churn while keeping risk drift in check."
+  },
+
+  "constraints": {
+    "prohibited_actions": [
+      "LEVERAGE",
+      "MARGIN",
+      "MARKET_TIMING",
+      "CONCENTRATED_SINGLE_SECURITY",
+      "SILENT_POLICY_CHANGE"
+    ],
+    "wrappers_supported": [
+      "ISA",
+      "SIPP",
+      "GIA",
+      "TRUST",
+      "OTHER"
+    ]
+  },
+
+  "meta": {
+    "derived_from_ipm_version": "0.1-default",
+    "notes": "Safe default runtime policy when no local policy is present."
+  }
+}
