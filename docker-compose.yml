@@ -11,6 +11,7 @@ services:
     volumes:
       - ./agent:/app
       - /app/node_modules
+      - ./artifacts:/artifacts:ro
     environment:
       NODE_ENV: development
       NEXT_DISABLE_EDGE_RUNTIME: "1"
