@@ -43,7 +43,9 @@ Rules:
 Output:
 - Plain text for Milestone #1.
       `.trim(),
-      model: "google/gemini-2.5-flash",
+      // model: "google/gemini-2.5-flash",
+      model: "google/gemini-2.5-flash-lite",
+
     }),
   },
 });
