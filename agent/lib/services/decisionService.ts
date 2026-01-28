@@ -8,6 +8,7 @@
  * - Accept optional structured portfolio state
  * - Compute drift deterministically (no LLM math)
  * - Ask the LLM ONLY for recommendation + explanation
+ * - Validate the model response shape before building the snapshot
  * - Emit a complete Decision Snapshot
  */
 
@@ -29,6 +30,10 @@ const SNAPSHOT_VERSION = "0.3";
 export async function runDecision(req: ChatRequest): Promise<{ snapshot: DecisionSnapshot }> {
   const snapshotId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
+
+  if (!Array.isArray(req.messages)) {
+    throw new Error("runDecision: messages must be an array");
+  }
 
   /**
    * ------------------------------------------------------------------
@@ -118,13 +123,83 @@ Portfolio state has NOT been provided.
 
   /**
    * ------------------------------------------------------------------
-   * Invoke LLM (reasoning + explanation only)
+   * Invoke LLM (reasoning + explanation only; parse + validate JSON)
    * ------------------------------------------------------------------
    */
-  const modelResponse = await generateAssistantReply({
+  const rawResponse = await generateAssistantReply({
     messages: req.messages,
     systemPrompt: prompt,
   });
+  const cleanedResponse = rawResponse.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
+  let modelResponse: unknown;
+  console.log("[APE] Decision model raw response:", rawResponse);
+  try {
+    modelResponse = JSON.parse(cleanedResponse);
+  } catch {
+    throw new Error("Decision model response was not valid JSON.");
+  }
+  if (!modelResponse || typeof modelResponse !== "object") {
+    throw new Error("Decision model response must be a JSON object.");
+  }
+  const response = modelResponse as {
+    recommendation_type?: RecommendationType;
+    recommendation_summary?: string;
+    proposed_actions?: DecisionSnapshot["recommendation"]["proposed_actions"];
+    explanation?: DecisionSnapshot["explanation"];
+  };
+  if (!response.recommendation_type || typeof response.recommendation_type !== "string") {
+    throw new Error("Decision model response missing recommendation_type.");
+  }
+  if (!response.recommendation_summary || typeof response.recommendation_summary !== "string") {
+    throw new Error("Decision model response missing recommendation_summary.");
+  }
+  if (!response.explanation || typeof response.explanation !== "object") {
+    throw new Error("Decision model response missing explanation.");
+  }
+  if (response.proposed_actions === undefined) {
+    response.proposed_actions = [];
+  }
+  if (!Array.isArray(response.proposed_actions)) {
+    throw new Error("Decision model response proposed_actions must be an array.");
+  }
+  const allowedAssetClasses: DecisionSnapshot["recommendation"]["proposed_actions"][number]["asset_class"][] =
+    ["EQUITIES", "BONDS", "CASH"];
+  const allowedActions: DecisionSnapshot["recommendation"]["proposed_actions"][number]["action"][] = [
+    "BUY",
+    "SELL",
+    "HOLD",
+  ];
+  for (const [index, action] of response.proposed_actions.entries()) {
+    if (!action || typeof action !== "object") {
+      throw new Error(`Decision model response proposed_actions[${index}] must be an object.`);
+    }
+    if (!allowedAssetClasses.includes(action.asset_class)) {
+      throw new Error(`Decision model response proposed_actions[${index}].asset_class is invalid.`);
+    }
+    if (!allowedActions.includes(action.action)) {
+      throw new Error(`Decision model response proposed_actions[${index}].action is invalid.`);
+    }
+    if (action.amount !== null && typeof action.amount !== "number") {
+      throw new Error(`Decision model response proposed_actions[${index}].amount is invalid.`);
+    }
+    if (!action.rationale || typeof action.rationale !== "string") {
+      throw new Error(`Decision model response proposed_actions[${index}].rationale is invalid.`);
+    }
+  }
+  const explanation = response.explanation as DecisionSnapshot["explanation"];
+  const requiredExplanationKeys: Array<keyof DecisionSnapshot["explanation"]> = [
+    "decision_summary",
+    "relevant_portfolio_state",
+    "policy_basis",
+    "reasoning_and_tradeoffs",
+    "uncertainty_and_confidence",
+    "next_review_or_trigger",
+  ];
+  for (const key of requiredExplanationKeys) {
+    if (!explanation[key] || typeof explanation[key] !== "string") {
+      throw new Error(`Decision model response missing explanation.${key}.`);
+    }
+  }
 
   /**
    * ------------------------------------------------------------------
@@ -220,16 +295,16 @@ Portfolio state has NOT been provided.
     },
 
     recommendation: {
-      type: modelResponse.recommendation_type as RecommendationType,
-      summary: modelResponse.recommendation_summary,
-      proposed_actions: modelResponse.proposed_actions ?? [],
+      type: response.recommendation_type,
+      summary: response.recommendation_summary,
+      proposed_actions: response.proposed_actions ?? [],
       turnover_estimate: {
         gross_turnover_pct: null, // #TODO: compute once trades are formalised
-        trade_count: modelResponse.proposed_actions?.length ?? 0,
+        trade_count: response.proposed_actions?.length ?? 0,
       },
     },
 
-    explanation: modelResponse.explanation,
+    explanation: response.explanation,
 
     user_acknowledgement: {
       decision: "DEFER",

@@ -13,16 +13,27 @@ import { NextResponse } from "next/server";
 import type { ChatRequest } from "@/lib/domain/chat";
 import { runDecision } from "@/lib/services/decisionService";
 
-export const runtime = "nodejs";
-
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as ChatRequest;
-    const result = await runDecision(body);
+
+    // 🔒 Enforce correct request shape
+    if (!Array.isArray(body.messages)) {
+      throw new Error("Invalid request: messages must be an array");
+    }
+
+    const result = await runDecision({
+      messages: body.messages,
+      portfolio_state: body.portfolio_state,
+    });
+
     return NextResponse.json(result);
   } catch (err) {
     console.error("Decision API error:", err);
-    return NextResponse.json({ error: "failed to generate" }, { status: 500 });
+    return NextResponse.json(
+      { error: "failed to generate decision" },
+      { status: 500 }
+    );
   }
 }
 
