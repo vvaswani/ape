@@ -86,11 +86,3 @@ type ChatResponse = {
 * `500` only for unexpected server failures (MVP).
   (Expected “bad model output” should **not** 500; it should fallback.)
 
-
-
-
-
-```
-docs(api): add decision API contract and milestone checklist
-```
-
