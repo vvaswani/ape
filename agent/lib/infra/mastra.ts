@@ -43,7 +43,9 @@ Rules:
 Output:
 - Plain text for Milestone #1.
       `.trim(),
-      model: "google/gemini-2.5-flash",
+      // model: "google/gemini-2.5-flash",
+      model: "google/gemini-2.5-flash-lite",
+
     }),
   },
 });
@@ -61,14 +63,22 @@ function toAgentMessages(messages: ChatMessage[]) {
   }));
 }
 
+export interface GenerateAssistantReplyInput {
+  messages: ChatMessage[];
+  systemPrompt?: string;
+}
+
 /**
  * Generate an assistant response using the Mastra agent.
  *
- * @param messages - Full conversation history.
+ * @param input - Full conversation history and optional system prompt.
  * @returns Assistant response content as plain text.
  */
-export async function generateAssistantReply(messages: ChatMessage[]): Promise<string> {
+export async function generateAssistantReply(input: GenerateAssistantReplyInput): Promise<string> {
   const agent = mastra.getAgent("apeAgent");
-  const result = await agent.generate(toAgentMessages(messages));
+  const finalMessages = input.systemPrompt
+    ? [{ role: "system", content: input.systemPrompt }, ...input.messages]
+    : input.messages;
+  const result = await agent.generate(toAgentMessages(finalMessages));
   return result.text ?? "";
 }

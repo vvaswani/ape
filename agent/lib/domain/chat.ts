@@ -7,6 +7,8 @@
  * Keeping these in one place prevents "UI shapes the protocol" drift.
  */
 
+import type { PortfolioStateInput } from "@/lib/domain/portfolioState";
+
 /**
  * A supported chat role for multi-turn conversation.
  */
@@ -36,6 +38,12 @@ export interface ChatRequest {
    * The service may apply truncation or limits as needed.
    */
   messages: ChatMessage[];
+
+  /**
+   * Optional structured portfolio snapshot provided by the user.
+   * If present, it becomes authoritative factual input for drift computation.
+   */
+  portfolio_state?: PortfolioStateInput;
 }
 
 /**

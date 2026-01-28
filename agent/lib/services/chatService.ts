@@ -55,7 +55,7 @@ function normalizeRequest(req: ChatRequest): ChatMessage[] {
  */
 export async function runChat(req: ChatRequest): Promise<ChatResponse> {
   const messages = normalizeRequest(req);
-  const content = await generateAssistantReply(messages);
+  const content = await generateAssistantReply({ messages });
 
   return {
     assistant: { content },
