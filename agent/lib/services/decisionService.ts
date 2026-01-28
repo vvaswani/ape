@@ -9,6 +9,7 @@
  * - Compute drift deterministically (no LLM math)
  * - Ask the LLM ONLY for recommendation + explanation
  * - Validate the model response shape before building the snapshot
+ * - Fall back to a safe response when model output is invalid
  * - Emit a complete Decision Snapshot
  */
 
@@ -130,63 +131,63 @@ Portfolio state has NOT been provided.
     messages: req.messages,
     systemPrompt: prompt,
   });
-  const cleanedResponse = rawResponse.replace(/```(?:json)?\s*/gi, "").replace(/```/g, "").trim();
-  let modelResponse: unknown;
   console.log("[APE] Decision model raw response:", rawResponse);
+  const cleanedResponse = rawResponse
+    .replace(/^\s*```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/i, "")
+    .trim();
+  let modelResponse: unknown;
   try {
     modelResponse = JSON.parse(cleanedResponse);
   } catch {
-    throw new Error("Decision model response was not valid JSON.");
+    modelResponse = null;
   }
-  if (!modelResponse || typeof modelResponse !== "object") {
-    throw new Error("Decision model response must be a JSON object.");
-  }
-  const response = modelResponse as {
+
+  const invalidResponseFallback = {
+    recommendation_type: "DEFER_AND_REVIEW" as RecommendationType,
+    recommendation_summary: "Model output was invalid; deferring and requesting a retry.",
+    proposed_actions: [],
+    explanation: {
+      decision_summary: "Model returned invalid JSON; raw output was logged for review.",
+      relevant_portfolio_state: state ? "Structured portfolio state was provided." : "No portfolio state.",
+      policy_basis: "Cannot provide a policy-aligned recommendation without a valid model response.",
+      reasoning_and_tradeoffs:
+        "Returning a safe default avoids acting on malformed output. A retry can provide a valid response.",
+      uncertainty_and_confidence: "High uncertainty due to invalid model output.",
+      next_review_or_trigger: "Retry the request or provide missing inputs if prompted.",
+    },
+  };
+
+  const response = (modelResponse && typeof modelResponse === "object" ? modelResponse : null) as {
     recommendation_type?: RecommendationType;
     recommendation_summary?: string;
     proposed_actions?: DecisionSnapshot["recommendation"]["proposed_actions"];
     explanation?: DecisionSnapshot["explanation"];
-  };
-  if (!response.recommendation_type || typeof response.recommendation_type !== "string") {
-    throw new Error("Decision model response missing recommendation_type.");
+  } | null;
+  let validatedResponse = response ?? invalidResponseFallback;
+  let usedFallback = validatedResponse === invalidResponseFallback;
+
+  if (!validatedResponse.recommendation_type || typeof validatedResponse.recommendation_type !== "string") {
+    validatedResponse = invalidResponseFallback;
+    usedFallback = true;
   }
-  if (!response.recommendation_summary || typeof response.recommendation_summary !== "string") {
-    throw new Error("Decision model response missing recommendation_summary.");
+  if (!validatedResponse.recommendation_summary || typeof validatedResponse.recommendation_summary !== "string") {
+    validatedResponse = invalidResponseFallback;
+    usedFallback = true;
   }
-  if (!response.explanation || typeof response.explanation !== "object") {
-    throw new Error("Decision model response missing explanation.");
+  if (!validatedResponse.explanation || typeof validatedResponse.explanation !== "object") {
+    validatedResponse = invalidResponseFallback;
+    usedFallback = true;
   }
-  if (response.proposed_actions === undefined) {
-    response.proposed_actions = [];
+  if (validatedResponse.proposed_actions === undefined) {
+    validatedResponse.proposed_actions = [];
   }
-  if (!Array.isArray(response.proposed_actions)) {
-    throw new Error("Decision model response proposed_actions must be an array.");
+  if (!Array.isArray(validatedResponse.proposed_actions)) {
+    validatedResponse = invalidResponseFallback;
+    usedFallback = true;
   }
-  const allowedAssetClasses: DecisionSnapshot["recommendation"]["proposed_actions"][number]["asset_class"][] =
-    ["EQUITIES", "BONDS", "CASH"];
-  const allowedActions: DecisionSnapshot["recommendation"]["proposed_actions"][number]["action"][] = [
-    "BUY",
-    "SELL",
-    "HOLD",
-  ];
-  for (const [index, action] of response.proposed_actions.entries()) {
-    if (!action || typeof action !== "object") {
-      throw new Error(`Decision model response proposed_actions[${index}] must be an object.`);
-    }
-    if (!allowedAssetClasses.includes(action.asset_class)) {
-      throw new Error(`Decision model response proposed_actions[${index}].asset_class is invalid.`);
-    }
-    if (!allowedActions.includes(action.action)) {
-      throw new Error(`Decision model response proposed_actions[${index}].action is invalid.`);
-    }
-    if (action.amount !== null && typeof action.amount !== "number") {
-      throw new Error(`Decision model response proposed_actions[${index}].amount is invalid.`);
-    }
-    if (!action.rationale || typeof action.rationale !== "string") {
-      throw new Error(`Decision model response proposed_actions[${index}].rationale is invalid.`);
-    }
-  }
-  const explanation = response.explanation as DecisionSnapshot["explanation"];
+
+  const explanation = validatedResponse.explanation as DecisionSnapshot["explanation"];
   const requiredExplanationKeys: Array<keyof DecisionSnapshot["explanation"]> = [
     "decision_summary",
     "relevant_portfolio_state",
@@ -197,8 +198,50 @@ Portfolio state has NOT been provided.
   ];
   for (const key of requiredExplanationKeys) {
     if (!explanation[key] || typeof explanation[key] !== "string") {
-      throw new Error(`Decision model response missing explanation.${key}.`);
+      validatedResponse = invalidResponseFallback;
+      usedFallback = true;
+      break;
     }
+  }
+
+  if (validatedResponse !== invalidResponseFallback) {
+    const allowedAssetClasses: DecisionSnapshot["recommendation"]["proposed_actions"][number]["asset_class"][] =
+      ["EQUITIES", "BONDS", "CASH"];
+    const allowedActions: DecisionSnapshot["recommendation"]["proposed_actions"][number]["action"][] = [
+      "BUY",
+      "SELL",
+      "HOLD",
+    ];
+    for (const [index, action] of validatedResponse.proposed_actions.entries()) {
+      if (!action || typeof action !== "object") {
+        validatedResponse = invalidResponseFallback;
+        usedFallback = true;
+        break;
+      }
+      if (!allowedAssetClasses.includes(action.asset_class)) {
+        validatedResponse = invalidResponseFallback;
+        usedFallback = true;
+        break;
+      }
+      if (!allowedActions.includes(action.action)) {
+        validatedResponse = invalidResponseFallback;
+        usedFallback = true;
+        break;
+      }
+      if (action.amount !== null && typeof action.amount !== "number") {
+        validatedResponse = invalidResponseFallback;
+        usedFallback = true;
+        break;
+      }
+      if (!action.rationale || typeof action.rationale !== "string") {
+        validatedResponse = invalidResponseFallback;
+        usedFallback = true;
+        break;
+      }
+    }
+  }
+  if (usedFallback) {
+    console.warn("[APE] Decision model fallback used due to invalid response.");
   }
 
   /**
@@ -295,16 +338,16 @@ Portfolio state has NOT been provided.
     },
 
     recommendation: {
-      type: response.recommendation_type,
-      summary: response.recommendation_summary,
-      proposed_actions: response.proposed_actions ?? [],
+      type: validatedResponse.recommendation_type,
+      summary: validatedResponse.recommendation_summary,
+      proposed_actions: validatedResponse.proposed_actions ?? [],
       turnover_estimate: {
         gross_turnover_pct: null, // #TODO: compute once trades are formalised
-        trade_count: response.proposed_actions?.length ?? 0,
+        trade_count: validatedResponse.proposed_actions?.length ?? 0,
       },
     },
 
-    explanation: response.explanation,
+    explanation: validatedResponse.explanation,
 
     user_acknowledgement: {
       decision: "DEFER",
