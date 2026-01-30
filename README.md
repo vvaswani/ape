@@ -46,6 +46,16 @@ Then browse to:
 
 * This repository follows the Conventional Commits Specification for commits and pull requests.
 
+## Testing
+
+Unit tests live under `agent/` and use Vitest. To run them locally:
+
+```bash
+cd agent
+npm install
+npm test
+```
+
 ## Repository layout
 
 This repo is a single Git repository with a service-style structure:
@@ -75,4 +85,3 @@ For anything large or sensitive, attach it to the ticket/PR instead of committin
 * Decision API spec
 * Artifacts conventions
 * Policy file conventions
-
