@@ -2,6 +2,30 @@ import { describe, expect, it, vi } from "vitest";
 
 import { runDecision } from "@/lib/services/decisionService";
 
+vi.mock("@/lib/infra/policyLoader", () => ({
+  loadPolicy: () => ({
+    policy_id: "ape-policy",
+    policy_version: "0.1-test",
+    source: "test",
+    jurisdiction: "UK",
+    strategic_asset_allocation: {
+      base_currency: "GBP",
+      target_weights: {
+        EQUITIES: 0.8,
+        BONDS: 0.15,
+        CASH: 0.05,
+      },
+    },
+    rebalancing_policy: {
+      absolute_bands: {
+        EQUITIES: 0.05,
+        BONDS: 0.04,
+        CASH: 0.02,
+      },
+    },
+  }),
+}));
+
 vi.mock("@/lib/infra/mastra", () => ({
   generateAssistantReply: vi.fn(async () =>
     JSON.stringify({
