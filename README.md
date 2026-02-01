@@ -23,6 +23,9 @@ cp .env.sample .env
 docker compose up --build
 ```
 
+> Note: Docker reads local environment variables from `.env` via `docker-compose.yml` (`env_file`).
+> Update `.env` for `LOG_LEVEL` or API keys.
+
 3) Browse to:
 
 * [http://localhost:3000](http://localhost:3000)
