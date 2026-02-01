@@ -47,7 +47,7 @@
 6. Three canonical scenarios produce correct outcomes (manual smoke tests):
 
    * In-band, no cashflows → `DO_NOTHING`
-   * Out-of-band, no cashflows → `PARTIAL_REBALANCE` or `FULL_REBALANCE` (per your rules)
+* Out-of-band, no cashflows → `REBALANCE`
    * In-band + contribution → `REBALANCE_VIA_CONTRIBUTIONS`
 
 ### Suggested Issues (copy into GitHub)

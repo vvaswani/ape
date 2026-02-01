@@ -182,7 +182,7 @@ If:
 * `bands_breached === true`
   Then valid types are:
 * `REBALANCE_VIA_CONTRIBUTIONS` (if contributions exist and can fix)
-* `PARTIAL_REBALANCE` / `FULL_REBALANCE`
+* `REBALANCE`
 * `DEFER_AND_REVIEW` (only if constraints missing)
 
 If model says `DO_NOTHING` → override to `DEFER_AND_REVIEW` with reason.

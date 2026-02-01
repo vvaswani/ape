@@ -19,6 +19,7 @@ import crypto from "node:crypto";
 import type { ChatRequest } from "@/lib/domain/chat";
 import type { DecisionSnapshot, RecommendationType } from "@/lib/domain/decisionSnapshot";
 import type { PortfolioStateInput } from "@/lib/domain/portfolioState";
+import type { PolicyJson } from "@/lib/infra/policyLoader";
 
 import { loadPolicy } from "@/lib/infra/policyLoader";
 import { generateAssistantReply } from "@/lib/infra/mastra";
@@ -225,6 +226,18 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
    */
   const driftResult = state && hasCompleteWeights(state) ? computeDrift(policy, state) : null;
 
+  const pendingContrib = state?.cash_flows.pending_contributions_gbp ?? null;
+  const pendingWithdraw = state?.cash_flows.pending_withdrawals_gbp ?? null;
+  const hasCashFlows = (pendingContrib ?? 0) > 0 || (pendingWithdraw ?? 0) > 0;
+
+  const expectedRecommendationType: RecommendationType = !state || !driftResult
+    ? "ASK_CLARIFYING_QUESTIONS"
+    : hasCashFlows
+      ? "REBALANCE_VIA_CONTRIBUTIONS"
+      : driftResult.bands_breached
+        ? "REBALANCE"
+        : "DO_NOTHING";
+
   /**
    * ------------------------------------------------------------------
    * Build LLM system prompt (minimal authority)
@@ -235,7 +248,7 @@ Return STRICT JSON ONLY (no markdown, no commentary).
 
 Schema:
 {
-  "recommendation_type": "DO_NOTHING|REBALANCE_VIA_CONTRIBUTIONS|PARTIAL_REBALANCE|FULL_REBALANCE|DEFER_AND_REVIEW|ASK_CLARIFYING_QUESTIONS",
+  "recommendation_type": "DO_NOTHING|REBALANCE|REBALANCE_VIA_CONTRIBUTIONS|DEFER_AND_REVIEW|ASK_CLARIFYING_QUESTIONS",
   "recommendation_summary": "one short sentence",
   "explanation": {
     "decision_summary": "string",
@@ -261,6 +274,7 @@ Important rules:
 - Rebalancing is a risk-management tool, not return optimisation.
 - NEVER invent missing weights or cash flows.
 - Use the policy targets and bands provided below; do not invent targets or bands.
+- The recommendation type is already decided: ${expectedRecommendationType}. Do NOT change it; only explain it.
 
 Policy (authoritative):
 - target_weights: equities=${policy.strategic_asset_allocation.target_weights.EQUITIES}, bonds=${policy.strategic_asset_allocation.target_weights.BONDS}, cash=${policy.strategic_asset_allocation.target_weights.CASH}
@@ -351,9 +365,8 @@ Portfolio state has NOT been provided.
 
     const allowedTypes: RecommendationType[] = [
       "DO_NOTHING",
+      "REBALANCE",
       "REBALANCE_VIA_CONTRIBUTIONS",
-      "PARTIAL_REBALANCE",
-      "FULL_REBALANCE",
       "DEFER_AND_REVIEW",
       "ASK_CLARIFYING_QUESTIONS",
     ];
@@ -455,7 +468,17 @@ Portfolio state has NOT been provided.
     console.warn("[APE] Guardrails applied:", guard.warnings);
   }
 
-  const finalModel = guard.model;
+  const contract = enforceExplanationContract({
+    expectedType: expectedRecommendationType,
+    model: guard.model,
+    policy,
+  });
+
+  if (contract.overridden || contract.warnings.length) {
+    console.warn("[APE] Explanation contract applied:", contract.warnings);
+  }
+
+  const finalModel = contract.model;
 
   /**
    * ------------------------------------------------------------------
@@ -576,6 +599,8 @@ Portfolio state has NOT been provided.
         usedFallback ? "Model JSON invalid: used fallback before guardrails." : null,
         guard.overridden ? "Guardrails overrode model output." : null,
         guard.warnings.length ? `Guardrails warnings: ${guard.warnings.join(" | ")}` : null,
+        contract.overridden ? "Explanation contract forced DEFER_AND_REVIEW." : null,
+        contract.warnings.length ? `Explanation warnings: ${contract.warnings.join(" | ")}` : null,
         auditWarnings.length ? `Input warnings: ${auditWarnings.join(" | ")}` : null,
         "#TODO: add structured audit.guardrails when schema supports it.",
       ]
@@ -592,4 +617,162 @@ Portfolio state has NOT been provided.
  */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+type ExplanationContractResult = {
+  model: ModelDecision;
+  warnings: string[];
+  overridden: boolean;
+};
+
+const REQUIRED_EXPLANATION_FIELDS: Record<
+  RecommendationType,
+  Array<keyof DecisionSnapshot["explanation"]>
+> = {
+  DO_NOTHING: [
+    "decision_summary",
+    "policy_basis",
+    "relevant_portfolio_state",
+    "reasoning_and_tradeoffs",
+    "uncertainty_and_confidence",
+    "next_review_or_trigger",
+  ],
+  REBALANCE: [
+    "decision_summary",
+    "policy_basis",
+    "relevant_portfolio_state",
+    "reasoning_and_tradeoffs",
+    "uncertainty_and_confidence",
+    "next_review_or_trigger",
+  ],
+  REBALANCE_VIA_CONTRIBUTIONS: [
+    "decision_summary",
+    "policy_basis",
+    "relevant_portfolio_state",
+    "reasoning_and_tradeoffs",
+    "uncertainty_and_confidence",
+    "next_review_or_trigger",
+  ],
+  ASK_CLARIFYING_QUESTIONS: [
+    "decision_summary",
+    "policy_basis",
+    "reasoning_and_tradeoffs",
+    "uncertainty_and_confidence",
+    "next_review_or_trigger",
+  ],
+  DEFER_AND_REVIEW: [
+    "decision_summary",
+    "policy_basis",
+    "reasoning_and_tradeoffs",
+    "uncertainty_and_confidence",
+    "next_review_or_trigger",
+  ],
+};
+
+function enforceExplanationContract(args: {
+  expectedType: RecommendationType;
+  model: ModelDecision;
+  policy: PolicyJson;
+}): ExplanationContractResult {
+  const { expectedType, model, policy } = args;
+  const warnings: string[] = [];
+
+  if (model.recommendation_type !== expectedType) {
+    warnings.push(
+      `recommendation_type mismatch (expected ${expectedType}, got ${model.recommendation_type}).`
+    );
+    return {
+      model: downgradeToDefer(model, policy, "Recommendation type mismatch."),
+      warnings,
+      overridden: true,
+    };
+  }
+
+  const required = REQUIRED_EXPLANATION_FIELDS[expectedType];
+  for (const key of required) {
+    const value = model.explanation[key];
+    if (!value || typeof value !== "string" || value.trim().length === 0) {
+      warnings.push(`explanation.${key} is missing or blank.`);
+    }
+  }
+  if (warnings.length) {
+    return {
+      model: downgradeToDefer(model, policy, "Explanation contract violation; safe fallback applied."),
+      warnings,
+      overridden: true,
+    };
+  }
+
+  if (!policyBasisReferencesPolicy(model.explanation.policy_basis, policy)) {
+    warnings.push("policy_basis does not reference required policy values.");
+    return {
+      model: downgradeToDefer(model, policy, "Explanation contract violation; policy values missing."),
+      warnings,
+      overridden: true,
+    };
+  }
+
+  if (expectedType === "ASK_CLARIFYING_QUESTIONS") {
+    const text = `${model.explanation.decision_summary} ${model.explanation.policy_basis} ${model.explanation.reasoning_and_tradeoffs}`.toLowerCase();
+    if (!text.includes("missing") && !text.includes("clarify") && !text.includes("provide")) {
+      warnings.push("ASK_CLARIFYING_QUESTIONS lacks explicit missing-input disclosure.");
+      return {
+        model: downgradeToDefer(model, policy, "Missing-input disclosure required."),
+        warnings,
+        overridden: true,
+      };
+    }
+  }
+
+  if (expectedType === "DEFER_AND_REVIEW") {
+    const text = `${model.explanation.decision_summary} ${model.explanation.policy_basis} ${model.explanation.reasoning_and_tradeoffs}`.toLowerCase();
+    if (!text.includes("defer") && !text.includes("review")) {
+      warnings.push("DEFER_AND_REVIEW lacks explicit defer/review rationale.");
+      return {
+        model: downgradeToDefer(model, policy, "Defer rationale required."),
+        warnings,
+        overridden: true,
+      };
+    }
+  }
+
+  return { model, warnings, overridden: false };
+}
+
+function policyBasisReferencesPolicy(policyBasis: string, policy: PolicyJson): boolean {
+  const targets = policy.strategic_asset_allocation.target_weights;
+  const bands = policy.rebalancing_policy.absolute_bands;
+  const values = [
+    targets.EQUITIES,
+    targets.BONDS,
+    targets.CASH,
+    bands.EQUITIES,
+    bands.BONDS,
+    bands.CASH,
+  ];
+
+  return values.every((value) => valueMentioned(policyBasis, value));
+}
+
+function valueMentioned(text: string, value: number): boolean {
+  const decimal = value.toString();
+  const percent = (value * 100).toString();
+  return text.includes(decimal) || text.includes(percent);
+}
+
+function downgradeToDefer(model: ModelDecision, policy: PolicyJson, reason: string): ModelDecision {
+  return {
+    ...model,
+    recommendation_type: "DEFER_AND_REVIEW",
+    recommendation_summary: "Defer and review required before proceeding.",
+    proposed_actions: [],
+    explanation: {
+      decision_summary: reason,
+      relevant_portfolio_state: model.explanation.relevant_portfolio_state || "Not provided.",
+      policy_basis: `Policy ${policy.policy_id} v${policy.policy_version} (${policy.source}).`,
+      reasoning_and_tradeoffs: "Cannot safely justify action; returning defer.",
+      uncertainty_and_confidence: "Low confidence due to contract violation.",
+      next_review_or_trigger: "Fix explanation contract and retry.",
+    },
+  };
 }
