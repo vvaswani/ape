@@ -113,4 +113,18 @@ describe("runDecision", () => {
 
     expect(result.snapshot.recommendation.type).toBe("FULL_REBALANCE");
   });
+
+  it("recommends rebalancing via contributions when drift is out of band with contributions (scenario 4)", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy.\n\nPortfolio state:\n- Total value: £100,000\n- Asset allocation:\n  - Equities: 86%\n  - Bonds: 9%\n  - Cash: 5%\n\nCash flows:\n- Planned contribution: £5,000\n- No withdrawals\n\nGenerate a decision snapshot and recommendation.",
+        },
+      ],
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("REBALANCE_VIA_CONTRIBUTIONS");
+  });
 });
