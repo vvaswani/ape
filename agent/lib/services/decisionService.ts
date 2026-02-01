@@ -399,9 +399,9 @@ Portfolio state has NOT been provided.
 
           if (
             typeof asset_class !== "string" ||
-            !allowedAssetClasses.includes(asset_class as any) ||
+            !allowedAssetClasses.includes(asset_class as "EQUITIES" | "BONDS" | "CASH") ||
             typeof action !== "string" ||
-            !allowedActions.includes(action as any) ||
+            !allowedActions.includes(action as "BUY" | "SELL" | "HOLD") ||
             (amount !== null && amount !== undefined && typeof amount !== "number") ||
             typeof rationale !== "string"
           ) {
