@@ -27,20 +27,37 @@ vi.mock("@/lib/infra/policyLoader", () => ({
 }));
 
 vi.mock("@/lib/infra/mastra", () => ({
-  generateAssistantReply: vi.fn(async () =>
-    JSON.stringify({
-      recommendation_summary: "Need more information to proceed.",
+  generateAssistantReply: vi.fn(async ({ systemPrompt }: { systemPrompt: string }) => {
+    const pickRecommendation = (): string => {
+      if (systemPrompt.includes("Portfolio state has NOT been provided.")) {
+        return "ASK_CLARIFYING_QUESTIONS";
+      }
+      if (systemPrompt.includes("weights: equities=0.73, bonds=0.2, cash=0.07")) {
+        return "ASK_CLARIFYING_QUESTIONS";
+      }
+      if (systemPrompt.includes("pending_contributions_gbp: 5000")) {
+        return "REBALANCE_VIA_CONTRIBUTIONS";
+      }
+      if (systemPrompt.includes("bands_breached: true")) {
+        return "FULL_REBALANCE";
+      }
+      return "DO_NOTHING";
+    };
+
+    return JSON.stringify({
+      recommendation_type: pickRecommendation(),
+      recommendation_summary: "Policy-aligned recommendation based on provided inputs.",
       proposed_actions: [],
       explanation: {
-        decision_summary: "Portfolio inputs are missing.",
-        relevant_portfolio_state: "No portfolio weights or cash flows provided.",
-        policy_basis: "Policy requires actual weights to compute drift.",
-        reasoning_and_tradeoffs: "Requesting inputs avoids acting on assumptions.",
-        uncertainty_and_confidence: "High uncertainty without portfolio data.",
-        next_review_or_trigger: "Provide portfolio weights and cash flow details.",
+        decision_summary: "Decision follows the investment policy guardrails.",
+        relevant_portfolio_state: "Inputs were parsed from the request.",
+        policy_basis: "Policy targets and bands govern rebalancing decisions.",
+        reasoning_and_tradeoffs: "Guardrails prevent unnecessary action.",
+        uncertainty_and_confidence: "High confidence given deterministic inputs.",
+        next_review_or_trigger: "Review if inputs or cash flows change.",
       },
-    })
-  ),
+    });
+  }),
 }));
 
 describe("runDecision", () => {

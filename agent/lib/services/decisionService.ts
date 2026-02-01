@@ -7,9 +7,10 @@
  * - Load and log the active investment policy
  * - Accept optional structured portfolio state
  * - Compute drift deterministically (no LLM math)
- * - Ask the LLM ONLY for recommendation + explanation
- * - Validate the model response shape before building the snapshot
- * - Fall back to a safe response when model output is invalid
+ * - Ask the LLM ONLY for recommendation + explanation (JSON)
+ * - Parse + validate the model response shape
+ * - Apply Milestone #3b guardrails (policy/deterministic boundaries)
+ * - Fall back safely when model output is invalid or violates guardrails
  * - Emit a complete Decision Snapshot
  */
 
@@ -21,8 +22,8 @@ import type { PortfolioStateInput } from "@/lib/domain/portfolioState";
 
 import { loadPolicy } from "@/lib/infra/policyLoader";
 import { generateAssistantReply } from "@/lib/infra/mastra";
-import logger from "@/lib/infra/logger";
 import { computeDrift } from "@/lib/services/drift";
+import { applyGuardrails, type ModelDecision } from "@/lib/services/guardrails";
 
 const SNAPSHOT_VERSION = "0.3";
 const EPS = 1e-6;
@@ -176,14 +177,13 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
    */
   const policy = loadPolicy();
 
-  logger.info(
-    { policy_id: policy.policy_id, policy_version: policy.policy_version, policy_source: policy.source },
-    "[APE] Loaded policy"
+  console.log(
+    `[APE] Loaded policy: id=${policy.policy_id} version=${policy.policy_version} source=${policy.source}`
   );
 
   /**
    * ------------------------------------------------------------------
-   * Structured portfolio state (optional in Milestone #3a)
+   * Structured + prompt-derived portfolio state (optional)
    * ------------------------------------------------------------------
    */
   const lastUserMessage = extractLastUserMessage(req.messages);
@@ -194,35 +194,29 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
     hasCompleteWeights(req.portfolio_state)
       ? req.portfolio_state
       : null;
-  const state: PortfolioStateInput | null = structuredState ?? parsedState ?? null;
 
   const auditWarnings: string[] = [];
   if (!structuredState) {
-    logger.info(
-      { form_state: describeFormState(req.portfolio_state) },
-      "[APE] Form state empty or incomplete"
-    );
+    console.log("[APE] Form state empty or incomplete:", describeFormState(req.portfolio_state));
   }
+
   const hasConflict =
     !!parsedState && !!structuredState && statesDiffer(parsedState, structuredState);
-  logger.debug(
-    {
-      parsed_state: !!parsedState,
-      structured_state: !!structuredState,
-      has_conflict: hasConflict,
-    },
-    "[APE] Conflict check"
-  );
   if (hasConflict) {
     const warning =
       "Prompt portfolio state conflicts with the form values. Please confirm the correct inputs.";
     auditWarnings.push(warning);
-    logger.warn({ warning }, "[APE] Prompt/form conflict");
+    console.warn("[APE] Prompt/form conflict:", warning);
   } else if (parsedState && !req.portfolio_state) {
     const warning = "Using prompt-derived portfolio state.";
     auditWarnings.push(warning);
-    logger.info({ warning }, "[APE] Prompt-derived state");
+    console.log("[APE] Prompt-derived state:", warning);
   }
+
+  // If there's a conflict, treat the state as missing to force clarification.
+  const state: PortfolioStateInput | null = hasConflict
+    ? null
+    : structuredState ?? parsedState ?? null;
 
   /**
    * ------------------------------------------------------------------
@@ -230,57 +224,10 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
    * ------------------------------------------------------------------
    */
   const driftResult = state && hasCompleteWeights(state) ? computeDrift(policy, state) : null;
-  if (state && driftResult) {
-    logger.info(
-      {
-        policy_targets: policy.strategic_asset_allocation.target_weights,
-        actual_weights: state.weights,
-        bands_breached: driftResult.bands_breached,
-      },
-      "[APE] Drift inputs"
-    );
-  }
-  const hasCashFlows =
-    state &&
-    ((state.cash_flows.pending_contributions_gbp ?? 0) !== 0 ||
-      (state.cash_flows.pending_withdrawals_gbp ?? 0) !== 0);
-
-  const recommendationType: RecommendationType = hasConflict
-    ? "ASK_CLARIFYING_QUESTIONS"
-    : !state || !driftResult
-      ? "ASK_CLARIFYING_QUESTIONS"
-      : !driftResult.bands_breached && !hasCashFlows
-        ? "DO_NOTHING"
-        : driftResult.bands_breached && hasCashFlows
-          ? "REBALANCE_VIA_CONTRIBUTIONS"
-          : "FULL_REBALANCE";
-
-  // TODO: Consider skipping LLM for conflict/clarification cases to reduce noisy explanations.
-  const deterministicExplanation =
-    recommendationType === "DO_NOTHING" && state && driftResult
-      ? {
-          recommendation_summary:
-            "Portfolio is within policy bands and has no planned cash flows; no action required.",
-          proposed_actions: [],
-          explanation: {
-            decision_summary:
-              "The portfolio is within the policy's rebalancing bands and does not require action.",
-            relevant_portfolio_state: `Current allocation: Equities ${state.weights.EQUITIES}, Bonds ${state.weights.BONDS}, Cash ${state.weights.CASH}.`,
-            policy_basis:
-              "The investment policy triggers rebalancing only when an asset class breaches its absolute band.",
-            reasoning_and_tradeoffs:
-              "Rebalancing when within bands would add unnecessary turnover without improving policy alignment.",
-            uncertainty_and_confidence:
-              "High confidence based on deterministic drift and absence of cash flows.",
-            next_review_or_trigger:
-              "Review at the next scheduled cadence or if bands are breached or cash flows occur.",
-          },
-        }
-      : null;
 
   /**
    * ------------------------------------------------------------------
-   * Build LLM prompt (conditional, minimal authority)
+   * Build LLM system prompt (minimal authority)
    * ------------------------------------------------------------------
    */
   const prompt = `
@@ -288,6 +235,7 @@ Return STRICT JSON ONLY (no markdown, no commentary).
 
 Schema:
 {
+  "recommendation_type": "DO_NOTHING|REBALANCE_VIA_CONTRIBUTIONS|PARTIAL_REBALANCE|FULL_REBALANCE|DEFER_AND_REVIEW|ASK_CLARIFYING_QUESTIONS",
   "recommendation_summary": "one short sentence",
   "explanation": {
     "decision_summary": "string",
@@ -309,18 +257,18 @@ Schema:
 
 Important rules:
 - No market predictions. No urgency.
-- Align strictly with the Investment Policy Model.
+- Align strictly with the Investment Policy Model and policy JSON.
 - Rebalancing is a risk-management tool, not return optimisation.
+- NEVER invent missing weights or cash flows.
 - Use the policy targets and bands provided below; do not invent targets or bands.
-- The recommendation type is already decided: ${recommendationType}. Do NOT change it; only explain it.
 
 Policy (authoritative):
 - target_weights: equities=${policy.strategic_asset_allocation.target_weights.EQUITIES}, bonds=${policy.strategic_asset_allocation.target_weights.BONDS}, cash=${policy.strategic_asset_allocation.target_weights.CASH}
 - absolute_bands: equities=${policy.rebalancing_policy.absolute_bands.EQUITIES}, bonds=${policy.rebalancing_policy.absolute_bands.BONDS}, cash=${policy.rebalancing_policy.absolute_bands.CASH}
 
 ${
-  state
-    ? `
+    state
+      ? `
 Portfolio state HAS been provided.
 - Do NOT ask for weights or cash flows.
 - Use the provided state and computed drift below.
@@ -336,44 +284,53 @@ Computed drift (deterministic):
 - absolute_drift: equities=${driftResult?.absolute_drift.EQUITIES}, bonds=${driftResult?.absolute_drift.BONDS}, cash=${driftResult?.absolute_drift.CASH}
 - bands_breached: ${driftResult?.bands_breached}
 `
-    : `
+      : `
 Portfolio state has NOT been provided.
 - Default to ASK_CLARIFYING_QUESTIONS or DEFER_AND_REVIEW.
 - Ask only for the minimum missing inputs required to proceed.
 `
-}
+  }
 `.trim();
 
   /**
    * ------------------------------------------------------------------
-   * Invoke LLM (reasoning + explanation only; parse + validate JSON)
+   * Invoke LLM (explanation only) + parse JSON
    * ------------------------------------------------------------------
    */
-  let modelResponse: unknown = deterministicExplanation;
-  if (!deterministicExplanation) {
-    const rawResponse = await generateAssistantReply({
-      messages: req.messages,
-      systemPrompt: prompt,
-    });
-    logger.debug({ raw_response: rawResponse }, "[APE] Decision model raw response");
-    const cleanedResponse = rawResponse
-      .replace(/^\s*```(?:json)?\s*/i, "")
-      .replace(/\s*```\s*$/i, "")
-      .trim();
-    try {
-      modelResponse = JSON.parse(cleanedResponse);
-    } catch {
-      modelResponse = null;
-    }
+  const rawResponse = await generateAssistantReply({
+    messages: req.messages,
+    systemPrompt: prompt,
+  });
+
+  // Keep this for dev; consider logging only on parse failure later.
+  console.log("[APE] Decision model raw response:", rawResponse);
+
+  // Tolerate fenced JSON (```json ... ```)
+  const cleanedResponse = rawResponse
+    .replace(/^\s*```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/i, "")
+    .trim();
+
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(cleanedResponse);
+  } catch {
+    parsed = null;
   }
 
-  const invalidResponseFallback = {
-    recommendation_summary: "Model output was invalid; using a safe default explanation.",
+  /**
+   * ------------------------------------------------------------------
+   * Validate model output shape (pre-guardrails)
+   * ------------------------------------------------------------------
+   */
+  const invalidResponseFallback: ModelDecision = {
+    recommendation_type: "DEFER_AND_REVIEW",
+    recommendation_summary: "Model output was invalid; deferring and requesting a retry.",
     proposed_actions: [],
     explanation: {
       decision_summary: "Model returned invalid JSON; raw output was logged for review.",
       relevant_portfolio_state: state ? "Structured portfolio state was provided." : "No portfolio state.",
-      policy_basis: "The recommendation type was decided deterministically by policy rules.",
+      policy_basis: "Cannot provide a policy-aligned recommendation without a valid model response.",
       reasoning_and_tradeoffs:
         "Returning a safe default avoids acting on malformed output. A retry can provide a valid response.",
       uncertainty_and_confidence: "High uncertainty due to invalid model output.",
@@ -381,168 +338,165 @@ Portfolio state has NOT been provided.
     },
   };
 
-  const response = (modelResponse && typeof modelResponse === "object" ? modelResponse : null) as {
-    recommendation_summary?: string;
-    proposed_actions?: DecisionSnapshot["recommendation"]["proposed_actions"];
-    explanation?: DecisionSnapshot["explanation"];
-  } | null;
-  let validatedResponse = response ?? invalidResponseFallback;
-  let usedFallback = validatedResponse === invalidResponseFallback;
+  const modelCandidate = isPlainObject(parsed) ? (parsed as Record<string, unknown>) : null;
 
-  if (!validatedResponse.recommendation_summary || typeof validatedResponse.recommendation_summary !== "string") {
-    validatedResponse = invalidResponseFallback;
-    usedFallback = true;
-  }
-  if (!validatedResponse.explanation || typeof validatedResponse.explanation !== "object") {
-    validatedResponse = invalidResponseFallback;
-    usedFallback = true;
-  }
-  if (validatedResponse.proposed_actions === undefined) {
-    validatedResponse.proposed_actions = [];
-  }
-  if (!Array.isArray(validatedResponse.proposed_actions)) {
-    validatedResponse = invalidResponseFallback;
-    usedFallback = true;
-  }
+  let modelDecision: ModelDecision = invalidResponseFallback;
+  let usedFallback = true;
 
-  const explanation = validatedResponse.explanation as DecisionSnapshot["explanation"];
-  const requiredExplanationKeys: Array<keyof DecisionSnapshot["explanation"]> = [
-    "decision_summary",
-    "relevant_portfolio_state",
-    "policy_basis",
-    "reasoning_and_tradeoffs",
-    "uncertainty_and_confidence",
-    "next_review_or_trigger",
-  ];
-  for (const key of requiredExplanationKeys) {
-    if (!explanation[key] || typeof explanation[key] !== "string") {
-      validatedResponse = invalidResponseFallback;
-      usedFallback = true;
-      break;
-    }
-  }
+  if (modelCandidate) {
+    const recommendation_type = modelCandidate["recommendation_type"];
+    const recommendation_summary = modelCandidate["recommendation_summary"];
+    const explanation = modelCandidate["explanation"];
+    const proposed_actions = modelCandidate["proposed_actions"];
 
-  if (validatedResponse !== invalidResponseFallback) {
-    const policyBasis = explanation.policy_basis;
-    const { EQUITIES, BONDS, CASH } = policy.strategic_asset_allocation.target_weights;
-    const targetPattern = /target[^0-9]*equities[^0-9]*([0-9]+(?:\.[0-9]+)?)%?[^0-9]*bonds[^0-9]*([0-9]+(?:\.[0-9]+)?)%?[^0-9]*cash[^0-9]*([0-9]+(?:\.[0-9]+)?)%?/i;
-    const match = targetPattern.exec(policyBasis);
-    if (match) {
-      const rawValues = [Number(match[1]), Number(match[2]), Number(match[3])];
-      const hasPercent = /%/.test(match[0]);
-      const parsed = {
-        EQUITIES: parseWeight(rawValues[0], hasPercent),
-        BONDS: parseWeight(rawValues[1], hasPercent),
-        CASH: parseWeight(rawValues[2], hasPercent),
-      };
-      const mismatch =
-        Math.abs(parsed.EQUITIES - EQUITIES) > EPS ||
-        Math.abs(parsed.BONDS - BONDS) > EPS ||
-        Math.abs(parsed.CASH - CASH) > EPS;
-      if (mismatch) {
-        logger.warn(
-          {
-            policy_targets: policy.strategic_asset_allocation.target_weights,
-            mentioned_targets: parsed,
-          },
-          "[APE] Model policy_basis mentions targets that differ from policy"
-        );
-      }
-    }
-  }
-
-  if (validatedResponse !== invalidResponseFallback) {
-    const allowedAssetClasses: DecisionSnapshot["recommendation"]["proposed_actions"][number]["asset_class"][] =
-      ["EQUITIES", "BONDS", "CASH"];
-    const allowedActions: DecisionSnapshot["recommendation"]["proposed_actions"][number]["action"][] = [
-      "BUY",
-      "SELL",
-      "HOLD",
+    const allowedTypes: RecommendationType[] = [
+      "DO_NOTHING",
+      "REBALANCE_VIA_CONTRIBUTIONS",
+      "PARTIAL_REBALANCE",
+      "FULL_REBALANCE",
+      "DEFER_AND_REVIEW",
+      "ASK_CLARIFYING_QUESTIONS",
     ];
-    for (const [index, action] of validatedResponse.proposed_actions.entries()) {
-      if (!action || typeof action !== "object") {
-        validatedResponse = invalidResponseFallback;
-        usedFallback = true;
-        break;
-      }
-      if (!allowedAssetClasses.includes(action.asset_class)) {
-        validatedResponse = invalidResponseFallback;
-        usedFallback = true;
-        break;
-      }
-      if (!allowedActions.includes(action.action)) {
-        validatedResponse = invalidResponseFallback;
-        usedFallback = true;
-        break;
-      }
-      if (action.amount !== null && typeof action.amount !== "number") {
-        validatedResponse = invalidResponseFallback;
-        usedFallback = true;
-        break;
-      }
-      if (!action.rationale || typeof action.rationale !== "string") {
-        validatedResponse = invalidResponseFallback;
-        usedFallback = true;
-        break;
+
+    const allowedAssetClasses: Array<"EQUITIES" | "BONDS" | "CASH"> = ["EQUITIES", "BONDS", "CASH"];
+    const allowedActions: Array<"BUY" | "SELL" | "HOLD"> = ["BUY", "SELL", "HOLD"];
+
+    if (
+      typeof recommendation_type === "string" &&
+      allowedTypes.includes(recommendation_type as RecommendationType) &&
+      typeof recommendation_summary === "string" &&
+      isPlainObject(explanation)
+    ) {
+      const exp = explanation as Record<string, unknown>;
+      const requiredExplanationKeys: Array<keyof DecisionSnapshot["explanation"]> = [
+        "decision_summary",
+        "relevant_portfolio_state",
+        "policy_basis",
+        "reasoning_and_tradeoffs",
+        "uncertainty_and_confidence",
+        "next_review_or_trigger",
+      ];
+
+      const explanationOk = requiredExplanationKeys.every(
+        (k) => typeof exp[k] === "string" && (exp[k] as string).length > 0
+      );
+
+      if (explanationOk) {
+        const actionsArray = Array.isArray(proposed_actions) ? proposed_actions : [];
+        const normalizedActions: ModelDecision["proposed_actions"] = [];
+
+        let actionsOk = true;
+        for (const item of actionsArray) {
+          if (!isPlainObject(item)) {
+            actionsOk = false;
+            break;
+          }
+          const a = item as Record<string, unknown>;
+          const asset_class = a["asset_class"];
+          const action = a["action"];
+          const amount = a["amount"];
+          const rationale = a["rationale"];
+
+          if (
+            typeof asset_class !== "string" ||
+            !allowedAssetClasses.includes(asset_class as any) ||
+            typeof action !== "string" ||
+            !allowedActions.includes(action as any) ||
+            (amount !== null && amount !== undefined && typeof amount !== "number") ||
+            typeof rationale !== "string"
+          ) {
+            actionsOk = false;
+            break;
+          }
+
+          normalizedActions.push({
+            asset_class: asset_class as "EQUITIES" | "BONDS" | "CASH",
+            action: action as "BUY" | "SELL" | "HOLD",
+            amount: amount === undefined ? null : (amount as number | null),
+            rationale,
+          });
+        }
+
+        if (actionsOk) {
+          modelDecision = {
+            recommendation_type: recommendation_type as RecommendationType,
+            recommendation_summary,
+            explanation: {
+              decision_summary: exp["decision_summary"] as string,
+              relevant_portfolio_state: exp["relevant_portfolio_state"] as string,
+              policy_basis: exp["policy_basis"] as string,
+              reasoning_and_tradeoffs: exp["reasoning_and_tradeoffs"] as string,
+              uncertainty_and_confidence: exp["uncertainty_and_confidence"] as string,
+              next_review_or_trigger: exp["next_review_or_trigger"] as string,
+            },
+            proposed_actions: normalizedActions,
+          };
+          usedFallback = false;
+        }
       }
     }
-  }
-  if (usedFallback) {
-    logger.warn("[APE] Decision model fallback used due to invalid response.");
   }
 
   /**
    * ------------------------------------------------------------------
-   * Build Decision Snapshot (authoritative output)
+   * Apply Milestone #3b guardrails (authoritative policy + drift boundaries)
+   * ------------------------------------------------------------------
+   */
+  const guard = applyGuardrails(
+    {
+      policy,
+      portfolio_state: state,
+      drift: driftResult,
+    },
+    modelDecision
+  );
+
+  if (guard.overridden || guard.warnings.length) {
+    console.warn("[APE] Guardrails applied:", guard.warnings);
+  }
+
+  const finalModel = guard.model;
+
+  /**
+   * ------------------------------------------------------------------
+   * Build Decision Snapshot
    * ------------------------------------------------------------------
    */
   const snapshot: DecisionSnapshot = {
     snapshot_id: snapshotId,
     snapshot_version: SNAPSHOT_VERSION,
     created_at: createdAt,
+
     project: "AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator)",
 
     context: {
       user_id: "local",
       environment: "dev",
-      jurisdiction: policy.jurisdiction,
-      base_currency: policy.strategic_asset_allocation.base_currency,
+      jurisdiction: policy.jurisdiction ?? "UK",
+      base_currency: policy.strategic_asset_allocation.base_currency ?? "GBP",
     },
 
     inputs: {
       portfolio_state: {
         total_value: state?.total_value_gbp ?? null,
-        asset_allocation: state
-          ? {
-              EQUITIES: state.weights.EQUITIES,
-              BONDS: state.weights.BONDS,
-              CASH: state.weights.CASH,
-            }
-          : {
-              EQUITIES: null,
-              BONDS: null,
-              CASH: null,
-            },
-        positions_summary: state
-          ? "Provided via manual structured input."
-          : "Not provided.",
-        cash_balance: null, // #TODO: add explicit cash_balance_gbp if needed later
+        asset_allocation: {
+          EQUITIES: state?.weights.EQUITIES ?? null,
+          BONDS: state?.weights.BONDS ?? null,
+          CASH: state?.weights.CASH ?? null,
+        },
+        positions_summary: state ? "Structured portfolio state provided (manual input)." : "Not provided.",
+        cash_balance: null,
       },
-
       cash_flows: {
         pending_contributions: state?.cash_flows.pending_contributions_gbp ?? null,
         pending_withdrawals: state?.cash_flows.pending_withdrawals_gbp ?? null,
-        notes: state
-          ? "Provided via manual structured input."
-          : "Not provided.",
+        notes: state ? "Structured cash flows provided (manual input)." : "Not provided.",
       },
-
       constraints: {
         liquidity_needs: "Not captured yet.",
         tax_or_wrapper_constraints: "Not captured yet.",
         other_constraints: "Not captured yet.",
       },
-
       market_context: {
         as_of_date: state?.as_of_date ?? new Date().toISOString().slice(0, 10),
         notes: "No exceptional market context assumed.",
@@ -562,44 +516,50 @@ Portfolio state has NOT been provided.
 
     evaluation: {
       drift_analysis: {
-        target_weights: policy.strategic_asset_allocation.target_weights,
-        actual_weights: driftResult?.actual_weights ?? {
-          EQUITIES: null,
-          BONDS: null,
-          CASH: null,
+        target_weights: {
+          EQUITIES: policy.strategic_asset_allocation.target_weights.EQUITIES,
+          BONDS: policy.strategic_asset_allocation.target_weights.BONDS,
+          CASH: policy.strategic_asset_allocation.target_weights.CASH,
         },
-        absolute_drift: driftResult?.absolute_drift ?? {
-          EQUITIES: null,
-          BONDS: null,
-          CASH: null,
+        actual_weights: {
+          EQUITIES: driftResult ? driftResult.actual_weights.EQUITIES : null,
+          BONDS: driftResult ? driftResult.actual_weights.BONDS : null,
+          CASH: driftResult ? driftResult.actual_weights.CASH : null,
         },
-        bands_breached: driftResult?.bands_breached ?? null,
+        absolute_drift: {
+          EQUITIES: driftResult ? driftResult.absolute_drift.EQUITIES : null,
+          BONDS: driftResult ? driftResult.absolute_drift.BONDS : null,
+          CASH: driftResult ? driftResult.absolute_drift.CASH : null,
+        },
+        bands_breached: driftResult ? driftResult.bands_breached : null,
       },
-
       risk_checks: {
-        risk_capacity_breached: null, // #TODO: implement risk capacity checks in Milestone #3b
-        notes: state
-          ? "Risk checks not yet implemented."
-          : "Risk checks require portfolio state.",
+        risk_capacity_breached: null,
+        notes: "Risk checks not implemented in Milestone #3b.",
       },
     },
 
     recommendation: {
-      type: recommendationType,
-      summary: validatedResponse.recommendation_summary,
-      proposed_actions: validatedResponse.proposed_actions ?? [],
+      type: finalModel.recommendation_type,
+      summary: finalModel.recommendation_summary,
+      proposed_actions: (finalModel.proposed_actions ?? []).map((a) => ({
+        asset_class: a.asset_class,
+        action: a.action,
+        amount: a.amount ?? null,
+        rationale: a.rationale,
+      })),
       turnover_estimate: {
-        gross_turnover_pct: null, // #TODO: compute once trades are formalised
-        trade_count: validatedResponse.proposed_actions?.length ?? 0,
+        gross_turnover_pct: null,
+        trade_count: (finalModel.proposed_actions ?? []).length,
       },
     },
 
-    explanation: validatedResponse.explanation,
+    explanation: finalModel.explanation,
 
     user_acknowledgement: {
       decision: "DEFER",
       acknowledged_at: null,
-      user_notes: "Snapshot generated; not yet implemented.",
+      user_notes: "Milestone #3b: guardrails enforced.",
     },
 
     outcome: {
@@ -611,10 +571,25 @@ Portfolio state has NOT been provided.
 
     audit: {
       logic_version: SNAPSHOT_VERSION,
-      notes: "Milestone #3a: structured portfolio state + deterministic drift.",
-      warnings: auditWarnings.length ? auditWarnings : undefined,
+      notes: [
+        "Milestone #3b: guardrails enforce policy/deterministic constraints.",
+        usedFallback ? "Model JSON invalid: used fallback before guardrails." : null,
+        guard.overridden ? "Guardrails overrode model output." : null,
+        guard.warnings.length ? `Guardrails warnings: ${guard.warnings.join(" | ")}` : null,
+        auditWarnings.length ? `Input warnings: ${auditWarnings.join(" | ")}` : null,
+        "#TODO: add structured audit.guardrails when schema supports it.",
+      ]
+        .filter(Boolean)
+        .join(" "),
     },
   };
 
   return { snapshot };
+}
+
+/**
+ * Narrow unknown to a plain object (not null/array).
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
 }
