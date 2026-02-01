@@ -93,3 +93,6 @@ artifacts/**/*.pdf
 !artifacts/**/templates/**
 !artifacts/**/README.md
 !artifacts/**/.keep
+
+# Local-only Codex/LLM handover notes (do not commit)
+artifacts/.codex/
