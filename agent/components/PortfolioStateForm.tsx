@@ -18,14 +18,21 @@ export default function PortfolioStateForm({
 }) {
   const [raw, setRaw] = useState({
     total: value.total_value_gbp?.toString() ?? "",
-    eq: value.weights.EQUITIES.toString(),
-    bd: value.weights.BONDS.toString(),
-    cs: value.weights.CASH.toString(),
+    eq: value.weights.EQUITIES?.toString() ?? "",
+    bd: value.weights.BONDS?.toString() ?? "",
+    cs: value.weights.CASH?.toString() ?? "",
     contrib: value.cash_flows.pending_contributions_gbp?.toString() ?? "",
     wd: value.cash_flows.pending_withdrawals_gbp?.toString() ?? "",
   });
 
   function toNum(s: string): number | null {
+    const t = s.trim();
+    if (!t) return null;
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function toWeight(s: string): number | null {
     const t = s.trim();
     if (!t) return null;
     const n = Number(t);
@@ -39,9 +46,9 @@ export default function PortfolioStateForm({
       as_of_date: value.as_of_date,
       total_value_gbp: toNum(nextRaw.total),
       weights: {
-        EQUITIES: Number(nextRaw.eq),
-        BONDS: Number(nextRaw.bd),
-        CASH: Number(nextRaw.cs),
+        EQUITIES: toWeight(nextRaw.eq),
+        BONDS: toWeight(nextRaw.bd),
+        CASH: toWeight(nextRaw.cs),
       },
       cash_flows: {
         pending_contributions_gbp: toNum(nextRaw.contrib),
@@ -57,6 +64,7 @@ export default function PortfolioStateForm({
       </div>
 
       <div className="composer" style={{ paddingTop: 0 }}>
+        <label className="chat__hint">As-of date</label>
         <input
           className="composer__input"
           value={value.as_of_date}
@@ -66,52 +74,55 @@ export default function PortfolioStateForm({
       </div>
 
       <div className="composer" style={{ paddingTop: 0 }}>
+        <label className="chat__hint">Total value (GBP)</label>
         <input
           className="composer__input"
           value={raw.total}
           onChange={(e) => update({ ...raw, total: e.target.value })}
-          placeholder="Total value (GBP, optional)"
+          placeholder="e.g. 100000"
         />
       </div>
 
       <div className="composer" style={{ paddingTop: 0 }}>
+        <label className="chat__hint">Asset allocation weights (decimals)</label>
         <input
           className="composer__input"
           value={raw.eq}
           onChange={(e) => update({ ...raw, eq: e.target.value })}
-          placeholder="Equities weight (e.g. 0.63)"
+          placeholder="Equities (e.g. 0.63)"
         />
         <input
           className="composer__input"
           value={raw.bd}
           onChange={(e) => update({ ...raw, bd: e.target.value })}
-          placeholder="Bonds weight (e.g. 0.27)"
+          placeholder="Bonds (e.g. 0.27)"
         />
         <input
           className="composer__input"
           value={raw.cs}
           onChange={(e) => update({ ...raw, cs: e.target.value })}
-          placeholder="Cash weight (e.g. 0.10)"
+          placeholder="Cash (e.g. 0.10)"
         />
       </div>
 
       <div className="composer" style={{ paddingTop: 0 }}>
+        <label className="chat__hint">Planned cash flows (GBP)</label>
         <input
           className="composer__input"
           value={raw.contrib}
           onChange={(e) => update({ ...raw, contrib: e.target.value })}
-          placeholder="Pending contribution (GBP, optional)"
+          placeholder="Pending contribution (optional)"
         />
         <input
           className="composer__input"
           value={raw.wd}
           onChange={(e) => update({ ...raw, wd: e.target.value })}
-          placeholder="Pending withdrawal (GBP, optional)"
+          placeholder="Pending withdrawal (optional)"
         />
       </div>
 
       <div className="chat__hint">
-        Weights should sum to ~1.0 (e.g., 0.63 + 0.27 + 0.10 = 1.00).
+        Weights should sum to ~1.0 (e.g., 0.63 + 0.27 + 0.10 = 1.00). Form inputs are authoritative when present.
       </div>
     </div>
   );

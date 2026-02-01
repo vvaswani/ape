@@ -23,9 +23,30 @@ cp .env.sample .env
 docker compose up --build
 ```
 
+> Note: Docker reads local environment variables from `.env` via `docker-compose.yml` (`env_file`).
+> Update `.env` for `LOG_LEVEL` or API keys.
+
 3) Browse to:
 
 * [http://localhost:3000](http://localhost:3000)
+
+#### Tests (Docker)
+
+Run the unit tests inside the container:
+
+```bash
+docker compose exec agent bun run test
+```
+
+Watch mode and coverage:
+
+```bash
+docker compose exec agent bun run test:watch
+docker compose exec agent bun run test:coverage
+```
+
+Note: the container uses a named `node_modules` volume. If tests fail with `vitest: not found`,
+run `docker compose exec agent bun install` once inside the running container.
 
 ### Option B: Run the agent app directly (no Docker)
 
@@ -45,6 +66,17 @@ Then browse to:
 ## Contributing
 
 * This repository follows the Conventional Commits Specification for commits and pull requests.
+* Run unit tests from the `agent/` directory: `npm run test`
+
+### Tests (Local)
+
+From `agent/`:
+
+```bash
+npm run test
+npm run test:watch
+npm run test:coverage
+```
 
 ## Repository layout
 

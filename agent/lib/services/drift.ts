@@ -31,8 +31,11 @@ export function computeDrift(policy: PolicyJson, state: PortfolioStateInput): Dr
     CASH: Math.abs(drift.CASH),
   };
 
+  const EPS = 1e-6;
   const breached =
-    abs.EQUITIES > bands.EQUITIES || abs.BONDS > bands.BONDS || abs.CASH > bands.CASH;
+    abs.EQUITIES - bands.EQUITIES > EPS ||
+    abs.BONDS - bands.BONDS > EPS ||
+    abs.CASH - bands.CASH > EPS;
 
   return {
     actual_weights: actual,
