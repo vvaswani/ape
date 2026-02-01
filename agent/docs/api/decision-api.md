@@ -21,9 +21,9 @@ type PortfolioStateInput = {
   total_value_gbp: number | null;
 
   weights: {
-    EQUITIES: number; // decimal (0.63 not 63)
-    BONDS: number;
-    CASH: number;
+    EQUITIES: number | null; // decimal (0.63 not 63)
+    BONDS: number | null;
+    CASH: number | null;
   };
 
   cash_flows: {
@@ -45,6 +45,7 @@ type ChatRequest = {
 
   * weights are **decimals** (0–1), not percentages
   * weights should sum to ~1.0 (validation may be loose in MVP)
+  * if any weights are missing/null, the state is treated as incomplete
 * Policy resolution order:
 
   1. `/artifacts/local/policy.local.json`
@@ -63,7 +64,7 @@ type ChatResponse = {
 * Always returns a snapshot on success.
 * If model output is invalid JSON, system returns a **safe fallback** snapshot:
 
-  * `recommendation.type = "DEFER_AND_REVIEW"`
+  * deterministic `recommendation.type` is preserved
   * explanation notes parsing failure
   * model raw output may be logged (dev)
 
@@ -77,7 +78,7 @@ type ChatResponse = {
   * portfolio_state input echo (`inputs.portfolio_state`)
 * Model-owned fields:
 
-  * recommendation type/summary
+  * recommendation summary
   * proposed actions (optional)
   * explanation text
 

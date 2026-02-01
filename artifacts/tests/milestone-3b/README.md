@@ -13,6 +13,7 @@ Milestone 3b focuses on ensuring that:
 - Decision Snapshots are always produced
 - Snapshots are **policy-aligned and deterministic**
 - Guardrails override model output when required
+- Recommendation **type** is deterministic; the LLM supplies explanation text only
 - “Do nothing” and “defer” outcomes are first-class, valid results
 
 These scenarios are executed **manually via the GUI** and are intended to be
@@ -114,5 +115,16 @@ These manual scenarios are expected to map **1:1** to future automated tests:
 - Snapshot fields → structured validation
 
 No scenario here should be discarded without an explicit replacement.
+
+---
+
+## Test Run Log (manual)
+
+Record manual test results here so milestone status is traceable.
+
+| Date (YYYY-MM-DD) | Scenario | Result | Notes |
+|---|---|---|---|
+| 2026-01-30 | Scenario 1 — Missing portfolio state | PASS | Asked clarifying questions due to missing state |
+| 2026-02-01 | Scenario 2 — In-band drift, no cash flows | PASS | Verified form/prompt precedence and deterministic DO_NOTHING |
 
 ---
