@@ -16,6 +16,7 @@ import ChatComposer from "@/components/ChatComposer";
 import ChatThread from "@/components/ChatThread";
 import ResponsePanel from "@/components/ResponsePanel";
 import DecisionPanel from "@/components/DecisionPanel";
+import clientLogger from "@/lib/infra/clientLogger";
 
 import type { ChatMessage, ChatRequest } from "@/lib/domain/chat";
 import type { DecisionSnapshot } from "@/lib/domain/decisionSnapshot";
@@ -39,7 +40,7 @@ export default function Page() {
   const [portfolioState, setPortfolioState] = useState<PortfolioStateInput>({
     as_of_date: new Date().toISOString().slice(0, 10),
     total_value_gbp: null,
-    weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+    weights: { EQUITIES: null, BONDS: null, CASH: null },
     cash_flows: { pending_contributions_gbp: null, pending_withdrawals_gbp: null },
   });
 
@@ -54,6 +55,7 @@ export default function Page() {
 
       try {
         const payload: ChatRequest = { messages: nextMessages, portfolio_state: portfolioState };
+        clientLogger.debug("[APE UI] Sending chat payload:", payload);
 
         const res = await fetch("/api/chat", {
           method: "POST",
@@ -85,7 +87,7 @@ export default function Page() {
         setIsLoading(false);
       }
     },
-    [messages]
+    [messages, portfolioState]
   );
 
   return (
