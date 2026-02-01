@@ -55,13 +55,17 @@ function firstExisting(paths: string[]): string | null {
  * - repo-root/artifacts/...
  */
 export function loadPolicy(): PolicyJson {
-
+  const cwd = process.cwd();
   const localCandidates = [
-    "/artifacts/local/policy.local.json"
+    path.resolve(cwd, "artifacts/local/policy.local.json"),
+    path.resolve(cwd, "..", "artifacts/local/policy.local.json"),
+    "/artifacts/local/policy.local.json",
   ];
 
   const defaultCandidates = [
-    "/artifacts/policy/default/policy.default.json"
+    path.resolve(cwd, "artifacts/policy/default/policy.default.json"),
+    path.resolve(cwd, "..", "artifacts/policy/default/policy.default.json"),
+    "/artifacts/policy/default/policy.default.json",
   ];
 
   const localPath = firstExisting(localCandidates);

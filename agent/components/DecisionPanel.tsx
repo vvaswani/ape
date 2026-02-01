@@ -26,6 +26,17 @@ export default function DecisionPanel({ snapshot }: { snapshot: DecisionSnapshot
           </div>
         </div>
 
+        {snapshot.audit.warnings && snapshot.audit.warnings.length > 0 && (
+          <div className="msg">
+            <div className="msg__meta">Warning</div>
+            <div className="msg__bubble">
+              {snapshot.audit.warnings.map((warning, index) => (
+                <div key={`${warning}-${index}`}>{warning}</div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="msg">
           <div className="msg__meta">Decision Summary</div>
           <div className="msg__bubble">{snapshot.explanation.decision_summary}</div>

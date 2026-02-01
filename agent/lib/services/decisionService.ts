@@ -24,6 +24,97 @@ import { generateAssistantReply } from "@/lib/infra/mastra";
 import { computeDrift } from "@/lib/services/drift";
 
 const SNAPSHOT_VERSION = "0.3";
+const EPS = 1e-6;
+
+function extractLastUserMessage(messages: ChatRequest["messages"]): string | null {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i]?.role === "user" && typeof messages[i]?.content === "string") {
+      return messages[i].content;
+    }
+  }
+  return null;
+}
+
+function parseNumber(raw: string): number | null {
+  const cleaned = raw.replace(/,/g, "").trim();
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseWeight(value: number, hasPercent: boolean): number {
+  if (hasPercent || value > 1) {
+    return value / 100;
+  }
+  return value;
+}
+
+function extractPortfolioStateFromPrompt(content: string): PortfolioStateInput | null {
+  const eqMatch = /equities[^0-9]*([0-9]+(?:\.[0-9]+)?)\s*(%?)/i.exec(content);
+  const bdMatch = /bonds?[^0-9]*([0-9]+(?:\.[0-9]+)?)\s*(%?)/i.exec(content);
+  const csMatch = /cash[^0-9]*([0-9]+(?:\.[0-9]+)?)\s*(%?)/i.exec(content);
+
+  if (!eqMatch || !bdMatch || !csMatch) {
+    return null;
+  }
+
+  const eqRaw = parseNumber(eqMatch[1]);
+  const bdRaw = parseNumber(bdMatch[1]);
+  const csRaw = parseNumber(csMatch[1]);
+  if (eqRaw === null || bdRaw === null || csRaw === null) {
+    return null;
+  }
+
+  const weights = {
+    EQUITIES: parseWeight(eqRaw, eqMatch[2] === "%"),
+    BONDS: parseWeight(bdRaw, bdMatch[2] === "%"),
+    CASH: parseWeight(csRaw, csMatch[2] === "%"),
+  };
+
+  const totalMatch = /total\s*value[^0-9]*([0-9,]+(?:\.[0-9]+)?)/i.exec(content);
+  const total_value_gbp = totalMatch ? parseNumber(totalMatch[1]) : null;
+
+  let pending_contributions_gbp: number | null = null;
+  let pending_withdrawals_gbp: number | null = null;
+  if (/no\s+new\s+contributions?/i.test(content)) {
+    pending_contributions_gbp = null;
+  } else {
+    const contribMatch = /contributions?[^0-9]*([0-9,]+(?:\.[0-9]+)?)/i.exec(content);
+    if (contribMatch) pending_contributions_gbp = parseNumber(contribMatch[1]);
+  }
+  if (/no\s+new\s+withdrawals?/i.test(content)) {
+    pending_withdrawals_gbp = null;
+  } else {
+    const wdMatch = /withdrawals?[^0-9]*([0-9,]+(?:\.[0-9]+)?)/i.exec(content);
+    if (wdMatch) pending_withdrawals_gbp = parseNumber(wdMatch[1]);
+  }
+
+  return {
+    as_of_date: new Date().toISOString().slice(0, 10),
+    total_value_gbp,
+    weights,
+    cash_flows: {
+      pending_contributions_gbp,
+      pending_withdrawals_gbp,
+    },
+  };
+}
+
+function statesDiffer(a: PortfolioStateInput, b: PortfolioStateInput): boolean {
+  const diffWeight =
+    Math.abs(a.weights.EQUITIES - b.weights.EQUITIES) > EPS ||
+    Math.abs(a.weights.BONDS - b.weights.BONDS) > EPS ||
+    Math.abs(a.weights.CASH - b.weights.CASH) > EPS;
+
+  const diffTotal = (a.total_value_gbp ?? null) !== (b.total_value_gbp ?? null);
+  const diffContrib =
+    (a.cash_flows.pending_contributions_gbp ?? null) !==
+    (b.cash_flows.pending_contributions_gbp ?? null);
+  const diffWd =
+    (a.cash_flows.pending_withdrawals_gbp ?? null) !==
+    (b.cash_flows.pending_withdrawals_gbp ?? null);
+
+  return diffWeight || diffTotal || diffContrib || diffWd;
+}
 
 /**
  * Main entry point for decision generation.
@@ -52,7 +143,18 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
    * Structured portfolio state (optional in Milestone #3a)
    * ------------------------------------------------------------------
    */
-  const state: PortfolioStateInput | null = req.portfolio_state ?? null;
+  const lastUserMessage = extractLastUserMessage(req.messages);
+  const parsedState = lastUserMessage ? extractPortfolioStateFromPrompt(lastUserMessage) : null;
+  const state: PortfolioStateInput | null = parsedState ?? req.portfolio_state ?? null;
+
+  const auditWarnings: string[] = [];
+  if (parsedState) {
+    const warning = req.portfolio_state && statesDiffer(parsedState, req.portfolio_state)
+      ? "Prompt portfolio state overrides form values due to mismatch. Using prompt-derived state."
+      : "Using prompt-derived portfolio state.";
+    auditWarnings.push(warning);
+    console.warn(`[APE] ${warning}`);
+  }
 
   /**
    * ------------------------------------------------------------------
@@ -60,6 +162,43 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
    * ------------------------------------------------------------------
    */
   const driftResult = state ? computeDrift(policy, state) : null;
+  if (state && driftResult) {
+    console.log("[APE] Drift inputs:");
+    console.log(
+      `  policy targets = { ${policy.strategic_asset_allocation.target_weights.EQUITIES}, ${policy.strategic_asset_allocation.target_weights.BONDS}, ${policy.strategic_asset_allocation.target_weights.CASH} }`
+    );
+    console.log(
+      `  actual weights = { ${state.weights.EQUITIES}, ${state.weights.BONDS}, ${state.weights.CASH} }`
+    );
+    console.log(`  bands breached = ${driftResult.bands_breached}`);
+  }
+  const hasCashFlows =
+    state &&
+    ((state.cash_flows.pending_contributions_gbp ?? 0) !== 0 ||
+      (state.cash_flows.pending_withdrawals_gbp ?? 0) !== 0);
+
+  const deterministicResponse =
+    state && driftResult && !driftResult.bands_breached && !hasCashFlows
+      ? {
+          recommendation_type: "DO_NOTHING" as RecommendationType,
+          recommendation_summary:
+            "Portfolio is within policy bands and has no planned cash flows; no action required.",
+          proposed_actions: [],
+          explanation: {
+            decision_summary:
+              "The portfolio is within the policy's rebalancing bands and does not require action.",
+            relevant_portfolio_state: `Current allocation: Equities ${state.weights.EQUITIES}, Bonds ${state.weights.BONDS}, Cash ${state.weights.CASH}.`,
+            policy_basis:
+              "The investment policy triggers rebalancing only when an asset class breaches its absolute band.",
+            reasoning_and_tradeoffs:
+              "Rebalancing when within bands would add unnecessary turnover without improving policy alignment.",
+            uncertainty_and_confidence:
+              "High confidence based on deterministic drift and absence of cash flows.",
+            next_review_or_trigger:
+              "Review at the next scheduled cadence or if bands are breached or cash flows occur.",
+          },
+        }
+      : null;
 
   /**
    * ------------------------------------------------------------------
@@ -127,20 +266,22 @@ Portfolio state has NOT been provided.
    * Invoke LLM (reasoning + explanation only; parse + validate JSON)
    * ------------------------------------------------------------------
    */
-  const rawResponse = await generateAssistantReply({
-    messages: req.messages,
-    systemPrompt: prompt,
-  });
-  console.log("[APE] Decision model raw response:", rawResponse);
-  const cleanedResponse = rawResponse
-    .replace(/^\s*```(?:json)?\s*/i, "")
-    .replace(/\s*```\s*$/i, "")
-    .trim();
-  let modelResponse: unknown;
-  try {
-    modelResponse = JSON.parse(cleanedResponse);
-  } catch {
-    modelResponse = null;
+  let modelResponse: unknown = deterministicResponse;
+  if (!deterministicResponse) {
+    const rawResponse = await generateAssistantReply({
+      messages: req.messages,
+      systemPrompt: prompt,
+    });
+    console.log("[APE] Decision model raw response:", rawResponse);
+    const cleanedResponse = rawResponse
+      .replace(/^\s*```(?:json)?\s*/i, "")
+      .replace(/\s*```\s*$/i, "")
+      .trim();
+    try {
+      modelResponse = JSON.parse(cleanedResponse);
+    } catch {
+      modelResponse = null;
+    }
   }
 
   const invalidResponseFallback = {
@@ -365,6 +506,7 @@ Portfolio state has NOT been provided.
     audit: {
       logic_version: SNAPSHOT_VERSION,
       notes: "Milestone #3a: structured portfolio state + deterministic drift.",
+      warnings: auditWarnings.length ? auditWarnings : undefined,
     },
   };
 

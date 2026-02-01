@@ -39,8 +39,8 @@ export default function Page() {
   const [portfolioState, setPortfolioState] = useState<PortfolioStateInput>({
     as_of_date: new Date().toISOString().slice(0, 10),
     total_value_gbp: null,
-    weights: { EQUITIES: 0.63, BONDS: 0.27, CASH: 0.1 },
-    cash_flows: { pending_contributions_gbp: 2000, pending_withdrawals_gbp: null },
+    weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+    cash_flows: { pending_contributions_gbp: null, pending_withdrawals_gbp: null },
   });
 
   const onSend = useCallback(

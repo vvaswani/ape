@@ -121,5 +121,6 @@ export interface DecisionSnapshot {
   audit: {
     logic_version: string;
     notes?: string;
+    warnings?: string[];
   };
 }
