@@ -468,9 +468,24 @@ Portfolio state has NOT been provided.
     console.warn("[APE] Guardrails applied:", guard.warnings);
   }
 
+  const guardedModel = guard.overridden
+    ? {
+        ...guard.model,
+        explanation: {
+          ...guard.model.explanation,
+          decision_summary: `Guardrails override applied. ${guard.warnings.join(" ")}`.trim(),
+          policy_basis: `${guard.model.explanation.policy_basis} Guardrails enforced: ${guard.warnings.join(" ")}`.trim(),
+          reasoning_and_tradeoffs:
+            "Guardrails overrode the model output to keep the recommendation policy-aligned.",
+          uncertainty_and_confidence:
+            "High confidence in guardrail enforcement; model output was overridden.",
+        },
+      }
+    : guard.model;
+
   const contract = enforceExplanationContract({
     expectedType: expectedRecommendationType,
-    model: guard.model,
+    model: guardedModel,
     policy,
   });
 
