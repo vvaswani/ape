@@ -99,4 +99,18 @@ describe("runDecision", () => {
       expect(result.snapshot.recommendation.type).toBe(expected);
     });
   });
+
+  it("recommends full rebalance when drift is out of band and no cash flows (scenario 3)", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy.\n\nPortfolio state:\n- Total value: £100,000\n- Asset allocation:\n  - Equities: 55%\n  - Bonds: 35%\n  - Cash: 10%\n\nThere are no new contributions or withdrawals planned.\n\nGenerate a decision snapshot and recommendation.",
+        },
+      ],
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("FULL_REBALANCE");
+  });
 });
