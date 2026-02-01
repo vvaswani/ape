@@ -314,4 +314,62 @@ describe("runDecision", () => {
     expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
     expect(result.snapshot.snapshot_id).toBeTruthy();
   });
+
+  it("explains guardrail overrides in the snapshot explanation", async () => {
+    forcedResponse = JSON.stringify({
+      recommendation_type: "DO_NOTHING",
+      recommendation_summary: "No action.",
+      proposed_actions: [],
+      explanation: {
+        decision_summary: "Model tried to do nothing.",
+        relevant_portfolio_state: "Inputs were parsed from the request.",
+        policy_basis:
+          "Targets: equities 0.8, bonds 0.15, cash 0.05. Bands: equities 0.05, bonds 0.04, cash 0.02.",
+        reasoning_and_tradeoffs: "Model output prior to guardrails.",
+        uncertainty_and_confidence: "Medium confidence.",
+        next_review_or_trigger: "Review if inputs change.",
+      },
+    });
+
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate against policy. Portfolio state: Equities 90%, Bonds 8%, Cash 2%. No new cash flows.",
+        },
+      ],
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+    expect(result.snapshot.explanation.decision_summary).toContain("Guardrails override");
+  });
+
+  it("downgrades when policy_basis does not reference policy values", async () => {
+    forcedResponse = JSON.stringify({
+      recommendation_type: "DO_NOTHING",
+      recommendation_summary: "No action.",
+      proposed_actions: [],
+      explanation: {
+        decision_summary: "Within tolerance.",
+        relevant_portfolio_state: "Inputs were parsed from the request.",
+        policy_basis: "Policy allows no action.",
+        reasoning_and_tradeoffs: "No action needed.",
+        uncertainty_and_confidence: "High confidence.",
+        next_review_or_trigger: "Review if inputs change.",
+      },
+    });
+
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+        },
+      ],
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+  });
 });

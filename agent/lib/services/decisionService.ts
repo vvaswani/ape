@@ -696,8 +696,11 @@ function enforceExplanationContract(args: {
     warnings.push(
       `recommendation_type mismatch (expected ${expectedType}, got ${model.recommendation_type}).`
     );
+    const mismatchReason = model.explanation.decision_summary.includes("Guardrails override")
+      ? model.explanation.decision_summary
+      : "Recommendation type mismatch.";
     return {
-      model: downgradeToDefer(model, policy, "Recommendation type mismatch."),
+      model: downgradeToDefer(model, policy, mismatchReason),
       warnings,
       overridden: true,
     };
