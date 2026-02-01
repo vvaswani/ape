@@ -344,7 +344,7 @@ Portfolio state has NOT been provided.
     explanation: {
       decision_summary: "Model returned invalid JSON; raw output was logged for review.",
       relevant_portfolio_state: state ? "Structured portfolio state was provided." : "No portfolio state.",
-      policy_basis: "Cannot provide a policy-aligned recommendation without a valid model response.",
+      policy_basis: buildPolicyBasis(policy),
       reasoning_and_tradeoffs:
         "Returning a safe default avoids acting on malformed output. A retry can provide a valid response.",
       uncertainty_and_confidence: "High uncertainty due to invalid model output.",
@@ -437,7 +437,7 @@ Portfolio state has NOT been provided.
             explanation: {
               decision_summary: exp["decision_summary"] as string,
               relevant_portfolio_state: exp["relevant_portfolio_state"] as string,
-              policy_basis: exp["policy_basis"] as string,
+              policy_basis: buildPolicyBasis(policy),
               reasoning_and_tradeoffs: exp["reasoning_and_tradeoffs"] as string,
               uncertainty_and_confidence: exp["uncertainty_and_confidence"] as string,
               next_review_or_trigger: exp["next_review_or_trigger"] as string,
@@ -772,6 +772,12 @@ function policyBasisReferencesPolicy(policyBasis: string, policy: PolicyJson): b
   return values.every((value) => valueMentioned(policyBasis, value));
 }
 
+function buildPolicyBasis(policy: PolicyJson): string {
+  const targets = policy.strategic_asset_allocation.target_weights;
+  const bands = policy.rebalancing_policy.absolute_bands;
+  return `Policy ${policy.policy_id} v${policy.policy_version} (${policy.source}). Targets: equities ${targets.EQUITIES}, bonds ${targets.BONDS}, cash ${targets.CASH}. Bands: equities ${bands.EQUITIES}, bonds ${bands.BONDS}, cash ${bands.CASH}.`;
+}
+
 function valueMentioned(text: string, value: number): boolean {
   const decimal = value.toString();
   const percent = (value * 100).toString();
@@ -787,7 +793,7 @@ function downgradeToDefer(model: ModelDecision, policy: PolicyJson, reason: stri
     explanation: {
       decision_summary: reason,
       relevant_portfolio_state: model.explanation.relevant_portfolio_state || "Not provided.",
-      policy_basis: `Policy ${policy.policy_id} v${policy.policy_version} (${policy.source}).`,
+      policy_basis: buildPolicyBasis(policy),
       reasoning_and_tradeoffs: "Cannot safely justify action; returning defer.",
       uncertainty_and_confidence: "Low confidence due to contract violation.",
       next_review_or_trigger: "Fix explanation contract and retry.",

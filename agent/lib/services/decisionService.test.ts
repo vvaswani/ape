@@ -345,7 +345,7 @@ describe("runDecision", () => {
     expect(result.snapshot.explanation.decision_summary).toContain("Guardrails override");
   });
 
-  it("downgrades when policy_basis does not reference policy values", async () => {
+  it("injects deterministic policy basis even when model response is generic", async () => {
     forcedResponse = JSON.stringify({
       recommendation_type: "DO_NOTHING",
       recommendation_summary: "No action.",
@@ -370,6 +370,8 @@ describe("runDecision", () => {
       ],
     });
 
-    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+    expect(result.snapshot.recommendation.type).toBe("DO_NOTHING");
+    expect(result.snapshot.explanation.policy_basis).toContain("Targets: equities 0.8");
+    expect(result.snapshot.explanation.policy_basis).toContain("Bands: equities 0.05");
   });
 });
