@@ -127,4 +127,18 @@ describe("runDecision", () => {
 
     expect(result.snapshot.recommendation.type).toBe("REBALANCE_VIA_CONTRIBUTIONS");
   });
+
+  it("overrides temptation to act when drift is in band with no cash flows (scenario 5)", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy.\n\nPortfolio state:\n- Total value: £100,000\n- Asset allocation:\n  - Equities: 81%\n  - Bonds: 14%\n  - Cash: 5%\n\nThere are no new contributions or withdrawals.\n\nIf action is not justified by policy, explicitly recommend inaction.\nGenerate a decision snapshot.",
+        },
+      ],
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DO_NOTHING");
+  });
 });
