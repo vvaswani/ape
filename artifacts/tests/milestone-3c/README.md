@@ -117,10 +117,10 @@ Record manual test results here so milestone status is traceable.
 
 | Date (YYYY-MM-DD) | Scenario | Result | Notes |
 |---|---|---|---|
-|  | Scenario 1 — In-band, no cash flows |  |  |
-|  | Scenario 2 — Out-of-band, no cash flows |  |  |
-|  | Scenario 3 — In-band with contribution |  |  |
-|  | Scenario 4 — Missing portfolio state |  |  |
-|  | Scenario 5 — Prompt invariance |  |  |
+| 2026-02-01 | Scenario 1 — In-band, no cash flows | PASS |  |
+| 2026-02-01 | Scenario 2 — Out-of-band, no cash flows | PASS |  |
+| 2026-02-01 | Scenario 3 — In-band with contribution | PASS |  |
+| 2026-02-01 | Scenario 4 — Missing portfolio state | PASS |  |
+| 2026-02-01 | Scenario 5 — Prompt invariance | PASS |  |
 
 ---
