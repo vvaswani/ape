@@ -21,6 +21,7 @@ import type { PortfolioStateInput } from "@/lib/domain/portfolioState";
 
 import { loadPolicy } from "@/lib/infra/policyLoader";
 import { generateAssistantReply } from "@/lib/infra/mastra";
+import logger from "@/lib/infra/logger";
 import { computeDrift } from "@/lib/services/drift";
 
 const SNAPSHOT_VERSION = "0.3";
@@ -76,13 +77,13 @@ function extractPortfolioStateFromPrompt(content: string): PortfolioStateInput |
   let pending_contributions_gbp: number | null = null;
   let pending_withdrawals_gbp: number | null = null;
   if (/no\s+new\s+contributions?/i.test(content)) {
-    pending_contributions_gbp = null;
+    pending_contributions_gbp = 0;
   } else {
     const contribMatch = /contributions?[^0-9]*([0-9,]+(?:\.[0-9]+)?)/i.exec(content);
     if (contribMatch) pending_contributions_gbp = parseNumber(contribMatch[1]);
   }
   if (/no\s+new\s+withdrawals?/i.test(content)) {
-    pending_withdrawals_gbp = null;
+    pending_withdrawals_gbp = 0;
   } else {
     const wdMatch = /withdrawals?[^0-9]*([0-9,]+(?:\.[0-9]+)?)/i.exec(content);
     if (wdMatch) pending_withdrawals_gbp = parseNumber(wdMatch[1]);
@@ -101,9 +102,9 @@ function extractPortfolioStateFromPrompt(content: string): PortfolioStateInput |
 
 function statesDiffer(a: PortfolioStateInput, b: PortfolioStateInput): boolean {
   const diffWeight =
-    Math.abs(a.weights.EQUITIES - b.weights.EQUITIES) > EPS ||
-    Math.abs(a.weights.BONDS - b.weights.BONDS) > EPS ||
-    Math.abs(a.weights.CASH - b.weights.CASH) > EPS;
+    Math.abs((a.weights.EQUITIES ?? 0) - (b.weights.EQUITIES ?? 0)) > EPS ||
+    Math.abs((a.weights.BONDS ?? 0) - (b.weights.BONDS ?? 0)) > EPS ||
+    Math.abs((a.weights.CASH ?? 0) - (b.weights.CASH ?? 0)) > EPS;
 
   const diffTotal = (a.total_value_gbp ?? null) !== (b.total_value_gbp ?? null);
   const diffContrib =
@@ -114,6 +115,47 @@ function statesDiffer(a: PortfolioStateInput, b: PortfolioStateInput): boolean {
     (b.cash_flows.pending_withdrawals_gbp ?? null);
 
   return diffWeight || diffTotal || diffContrib || diffWd;
+}
+
+function isEmptyState(state: PortfolioStateInput): boolean {
+  const weightsZero =
+    state.weights.EQUITIES === 0 &&
+    state.weights.BONDS === 0 &&
+    state.weights.CASH === 0;
+  const weightsUnset =
+    state.weights.EQUITIES === null &&
+    state.weights.BONDS === null &&
+    state.weights.CASH === null;
+  const weightsEmpty = weightsZero || weightsUnset;
+  const noTotals = state.total_value_gbp === null;
+  const noFlows =
+    state.cash_flows.pending_contributions_gbp === null &&
+    state.cash_flows.pending_withdrawals_gbp === null;
+  return weightsEmpty && noTotals && noFlows;
+}
+
+function hasCompleteWeights(state: PortfolioStateInput): boolean {
+  return (
+    typeof state.weights.EQUITIES === "number" &&
+    Number.isFinite(state.weights.EQUITIES) &&
+    typeof state.weights.BONDS === "number" &&
+    Number.isFinite(state.weights.BONDS) &&
+    typeof state.weights.CASH === "number" &&
+    Number.isFinite(state.weights.CASH)
+  );
+}
+
+function describeFormState(state: PortfolioStateInput | undefined): string {
+  if (!state) return "no portfolio_state provided";
+  const missing: string[] = [];
+  if (state.weights.EQUITIES === null) missing.push("weights.EQUITIES");
+  if (state.weights.BONDS === null) missing.push("weights.BONDS");
+  if (state.weights.CASH === null) missing.push("weights.CASH");
+  if (state.total_value_gbp === null) missing.push("total_value_gbp");
+  if (state.cash_flows.pending_contributions_gbp === null) missing.push("cash_flows.pending_contributions_gbp");
+  if (state.cash_flows.pending_withdrawals_gbp === null) missing.push("cash_flows.pending_withdrawals_gbp");
+  if (missing.length === 0) return "complete";
+  return `missing: ${missing.join(", ")}`;
 }
 
 /**
@@ -134,8 +176,9 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
    */
   const policy = loadPolicy();
 
-  console.log(
-    `[APE] Loaded policy: id=${policy.policy_id} version=${policy.policy_version} source=${policy.source}`
+  logger.info(
+    { policy_id: policy.policy_id, policy_version: policy.policy_version, policy_source: policy.source },
+    "[APE] Loaded policy"
   );
 
   /**
@@ -145,15 +188,40 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
    */
   const lastUserMessage = extractLastUserMessage(req.messages);
   const parsedState = lastUserMessage ? extractPortfolioStateFromPrompt(lastUserMessage) : null;
-  const state: PortfolioStateInput | null = parsedState ?? req.portfolio_state ?? null;
+  const structuredState =
+    req.portfolio_state &&
+    !isEmptyState(req.portfolio_state) &&
+    hasCompleteWeights(req.portfolio_state)
+      ? req.portfolio_state
+      : null;
+  const state: PortfolioStateInput | null = structuredState ?? parsedState ?? null;
 
   const auditWarnings: string[] = [];
-  if (parsedState) {
-    const warning = req.portfolio_state && statesDiffer(parsedState, req.portfolio_state)
-      ? "Prompt portfolio state overrides form values due to mismatch. Using prompt-derived state."
-      : "Using prompt-derived portfolio state.";
+  if (!structuredState) {
+    logger.info(
+      { form_state: describeFormState(req.portfolio_state) },
+      "[APE] Form state empty or incomplete"
+    );
+  }
+  const hasConflict =
+    !!parsedState && !!structuredState && statesDiffer(parsedState, structuredState);
+  logger.debug(
+    {
+      parsed_state: !!parsedState,
+      structured_state: !!structuredState,
+      has_conflict: hasConflict,
+    },
+    "[APE] Conflict check"
+  );
+  if (hasConflict) {
+    const warning =
+      "Prompt portfolio state conflicts with the form values. Please confirm the correct inputs.";
     auditWarnings.push(warning);
-    console.warn(`[APE] ${warning}`);
+    logger.warn({ warning }, "[APE] Prompt/form conflict");
+  } else if (parsedState && !req.portfolio_state) {
+    const warning = "Using prompt-derived portfolio state.";
+    auditWarnings.push(warning);
+    logger.info({ warning }, "[APE] Prompt-derived state");
   }
 
   /**
@@ -161,26 +229,36 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
    * Deterministic drift computation (ONLY if state exists)
    * ------------------------------------------------------------------
    */
-  const driftResult = state ? computeDrift(policy, state) : null;
+  const driftResult = state && hasCompleteWeights(state) ? computeDrift(policy, state) : null;
   if (state && driftResult) {
-    console.log("[APE] Drift inputs:");
-    console.log(
-      `  policy targets = { ${policy.strategic_asset_allocation.target_weights.EQUITIES}, ${policy.strategic_asset_allocation.target_weights.BONDS}, ${policy.strategic_asset_allocation.target_weights.CASH} }`
+    logger.info(
+      {
+        policy_targets: policy.strategic_asset_allocation.target_weights,
+        actual_weights: state.weights,
+        bands_breached: driftResult.bands_breached,
+      },
+      "[APE] Drift inputs"
     );
-    console.log(
-      `  actual weights = { ${state.weights.EQUITIES}, ${state.weights.BONDS}, ${state.weights.CASH} }`
-    );
-    console.log(`  bands breached = ${driftResult.bands_breached}`);
   }
   const hasCashFlows =
     state &&
     ((state.cash_flows.pending_contributions_gbp ?? 0) !== 0 ||
       (state.cash_flows.pending_withdrawals_gbp ?? 0) !== 0);
 
-  const deterministicResponse =
-    state && driftResult && !driftResult.bands_breached && !hasCashFlows
+  const recommendationType: RecommendationType = hasConflict
+    ? "ASK_CLARIFYING_QUESTIONS"
+    : !state || !driftResult
+      ? "ASK_CLARIFYING_QUESTIONS"
+      : !driftResult.bands_breached && !hasCashFlows
+        ? "DO_NOTHING"
+        : driftResult.bands_breached && hasCashFlows
+          ? "REBALANCE_VIA_CONTRIBUTIONS"
+          : "FULL_REBALANCE";
+
+  // TODO: Consider skipping LLM for conflict/clarification cases to reduce noisy explanations.
+  const deterministicExplanation =
+    recommendationType === "DO_NOTHING" && state && driftResult
       ? {
-          recommendation_type: "DO_NOTHING" as RecommendationType,
           recommendation_summary:
             "Portfolio is within policy bands and has no planned cash flows; no action required.",
           proposed_actions: [],
@@ -210,7 +288,6 @@ Return STRICT JSON ONLY (no markdown, no commentary).
 
 Schema:
 {
-  "recommendation_type": "DO_NOTHING|REBALANCE_VIA_CONTRIBUTIONS|PARTIAL_REBALANCE|FULL_REBALANCE|DEFER_AND_REVIEW|ASK_CLARIFYING_QUESTIONS",
   "recommendation_summary": "one short sentence",
   "explanation": {
     "decision_summary": "string",
@@ -234,6 +311,12 @@ Important rules:
 - No market predictions. No urgency.
 - Align strictly with the Investment Policy Model.
 - Rebalancing is a risk-management tool, not return optimisation.
+- Use the policy targets and bands provided below; do not invent targets or bands.
+- The recommendation type is already decided: ${recommendationType}. Do NOT change it; only explain it.
+
+Policy (authoritative):
+- target_weights: equities=${policy.strategic_asset_allocation.target_weights.EQUITIES}, bonds=${policy.strategic_asset_allocation.target_weights.BONDS}, cash=${policy.strategic_asset_allocation.target_weights.CASH}
+- absolute_bands: equities=${policy.rebalancing_policy.absolute_bands.EQUITIES}, bonds=${policy.rebalancing_policy.absolute_bands.BONDS}, cash=${policy.rebalancing_policy.absolute_bands.CASH}
 
 ${
   state
@@ -266,13 +349,13 @@ Portfolio state has NOT been provided.
    * Invoke LLM (reasoning + explanation only; parse + validate JSON)
    * ------------------------------------------------------------------
    */
-  let modelResponse: unknown = deterministicResponse;
-  if (!deterministicResponse) {
+  let modelResponse: unknown = deterministicExplanation;
+  if (!deterministicExplanation) {
     const rawResponse = await generateAssistantReply({
       messages: req.messages,
       systemPrompt: prompt,
     });
-    console.log("[APE] Decision model raw response:", rawResponse);
+    logger.debug({ raw_response: rawResponse }, "[APE] Decision model raw response");
     const cleanedResponse = rawResponse
       .replace(/^\s*```(?:json)?\s*/i, "")
       .replace(/\s*```\s*$/i, "")
@@ -285,13 +368,12 @@ Portfolio state has NOT been provided.
   }
 
   const invalidResponseFallback = {
-    recommendation_type: "DEFER_AND_REVIEW" as RecommendationType,
-    recommendation_summary: "Model output was invalid; deferring and requesting a retry.",
+    recommendation_summary: "Model output was invalid; using a safe default explanation.",
     proposed_actions: [],
     explanation: {
       decision_summary: "Model returned invalid JSON; raw output was logged for review.",
       relevant_portfolio_state: state ? "Structured portfolio state was provided." : "No portfolio state.",
-      policy_basis: "Cannot provide a policy-aligned recommendation without a valid model response.",
+      policy_basis: "The recommendation type was decided deterministically by policy rules.",
       reasoning_and_tradeoffs:
         "Returning a safe default avoids acting on malformed output. A retry can provide a valid response.",
       uncertainty_and_confidence: "High uncertainty due to invalid model output.",
@@ -300,7 +382,6 @@ Portfolio state has NOT been provided.
   };
 
   const response = (modelResponse && typeof modelResponse === "object" ? modelResponse : null) as {
-    recommendation_type?: RecommendationType;
     recommendation_summary?: string;
     proposed_actions?: DecisionSnapshot["recommendation"]["proposed_actions"];
     explanation?: DecisionSnapshot["explanation"];
@@ -308,10 +389,6 @@ Portfolio state has NOT been provided.
   let validatedResponse = response ?? invalidResponseFallback;
   let usedFallback = validatedResponse === invalidResponseFallback;
 
-  if (!validatedResponse.recommendation_type || typeof validatedResponse.recommendation_type !== "string") {
-    validatedResponse = invalidResponseFallback;
-    usedFallback = true;
-  }
   if (!validatedResponse.recommendation_summary || typeof validatedResponse.recommendation_summary !== "string") {
     validatedResponse = invalidResponseFallback;
     usedFallback = true;
@@ -342,6 +419,35 @@ Portfolio state has NOT been provided.
       validatedResponse = invalidResponseFallback;
       usedFallback = true;
       break;
+    }
+  }
+
+  if (validatedResponse !== invalidResponseFallback) {
+    const policyBasis = explanation.policy_basis;
+    const { EQUITIES, BONDS, CASH } = policy.strategic_asset_allocation.target_weights;
+    const targetPattern = /target[^0-9]*equities[^0-9]*([0-9]+(?:\.[0-9]+)?)%?[^0-9]*bonds[^0-9]*([0-9]+(?:\.[0-9]+)?)%?[^0-9]*cash[^0-9]*([0-9]+(?:\.[0-9]+)?)%?/i;
+    const match = targetPattern.exec(policyBasis);
+    if (match) {
+      const rawValues = [Number(match[1]), Number(match[2]), Number(match[3])];
+      const hasPercent = /%/.test(match[0]);
+      const parsed = {
+        EQUITIES: parseWeight(rawValues[0], hasPercent),
+        BONDS: parseWeight(rawValues[1], hasPercent),
+        CASH: parseWeight(rawValues[2], hasPercent),
+      };
+      const mismatch =
+        Math.abs(parsed.EQUITIES - EQUITIES) > EPS ||
+        Math.abs(parsed.BONDS - BONDS) > EPS ||
+        Math.abs(parsed.CASH - CASH) > EPS;
+      if (mismatch) {
+        logger.warn(
+          {
+            policy_targets: policy.strategic_asset_allocation.target_weights,
+            mentioned_targets: parsed,
+          },
+          "[APE] Model policy_basis mentions targets that differ from policy"
+        );
+      }
     }
   }
 
@@ -382,7 +488,7 @@ Portfolio state has NOT been provided.
     }
   }
   if (usedFallback) {
-    console.warn("[APE] Decision model fallback used due to invalid response.");
+    logger.warn("[APE] Decision model fallback used due to invalid response.");
   }
 
   /**
@@ -479,7 +585,7 @@ Portfolio state has NOT been provided.
     },
 
     recommendation: {
-      type: validatedResponse.recommendation_type,
+      type: recommendationType,
       summary: validatedResponse.recommendation_summary,
       proposed_actions: validatedResponse.proposed_actions ?? [],
       turnover_estimate: {

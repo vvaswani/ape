@@ -23,9 +23,9 @@ export interface PortfolioStateInput {
    * Must sum to ~1.0 (we'll validate loosely).
    */
   weights: {
-    EQUITIES: number;
-    BONDS: number;
-    CASH: number;
+    EQUITIES: number | null;
+    BONDS: number | null;
+    CASH: number | null;
   };
 
   /**
