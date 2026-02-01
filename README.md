@@ -30,6 +30,14 @@ docker compose up --build
 
 * [http://localhost:3000](http://localhost:3000)
 
+#### Tests (Docker)
+
+Run the unit tests inside the container:
+
+```bash
+docker compose exec agent bun run test
+```
+
 ### Option B: Run the agent app directly (no Docker)
 
 ```bash
@@ -48,6 +56,7 @@ Then browse to:
 ## Contributing
 
 * This repository follows the Conventional Commits Specification for commits and pull requests.
+* Run unit tests from the `agent/` directory: `npm run test`
 
 ## Repository layout
 
