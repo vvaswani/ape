@@ -38,6 +38,16 @@ Run the unit tests inside the container:
 docker compose exec agent bun run test
 ```
 
+Watch mode and coverage:
+
+```bash
+docker compose exec agent bun run test:watch
+docker compose exec agent bun run test:coverage
+```
+
+Note: the container uses a named `node_modules` volume. If tests fail with `vitest: not found`,
+run `docker compose exec agent bun install` once inside the running container.
+
 ### Option B: Run the agent app directly (no Docker)
 
 ```bash
@@ -57,6 +67,16 @@ Then browse to:
 
 * This repository follows the Conventional Commits Specification for commits and pull requests.
 * Run unit tests from the `agent/` directory: `npm run test`
+
+### Tests (Local)
+
+From `agent/`:
+
+```bash
+npm run test
+npm run test:watch
+npm run test:coverage
+```
 
 ## Repository layout
 
