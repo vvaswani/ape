@@ -15,7 +15,7 @@ export default defineConfig({
     setupFiles: ["./test/setup.ts"],
     include: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
     coverage: {
-      provider: "v8",
+      provider: "istanbul",
       reporter: ["text", "html", "lcov"],
       lines: 80,
       functions: 80,

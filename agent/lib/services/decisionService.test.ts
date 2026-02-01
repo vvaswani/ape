@@ -37,5 +37,11 @@ describe("runDecision", () => {
       BONDS: null,
       CASH: null,
     });
+    expect(result.snapshot.evaluation.drift_analysis.bands_breached).toBeNull();
+    expect(result.snapshot.evaluation.drift_analysis.actual_weights).toEqual({
+      EQUITIES: null,
+      BONDS: null,
+      CASH: null,
+    });
   });
 });
