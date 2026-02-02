@@ -1,6 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { runDecision } from "@/lib/services/decisionService";
+
+let forcedResponse: string | null = null;
 
 vi.mock("@/lib/infra/policyLoader", () => ({
   loadPolicy: () => ({
@@ -28,30 +30,43 @@ vi.mock("@/lib/infra/policyLoader", () => ({
 
 vi.mock("@/lib/infra/mastra", () => ({
   generateAssistantReply: vi.fn(async ({ systemPrompt }: { systemPrompt: string }) => {
+    if (forcedResponse !== null) {
+      return forcedResponse;
+    }
+
     const pickRecommendation = (): string => {
       if (systemPrompt.includes("Portfolio state has NOT been provided.")) {
         return "ASK_CLARIFYING_QUESTIONS";
       }
-      if (systemPrompt.includes("weights: equities=0.73, bonds=0.2, cash=0.07")) {
-        return "ASK_CLARIFYING_QUESTIONS";
-      }
-      if (systemPrompt.includes("pending_contributions_gbp: 5000")) {
+      if (
+        systemPrompt.includes("pending_contributions_gbp: 2000") ||
+        systemPrompt.includes("pending_contributions_gbp: 5000")
+      ) {
         return "REBALANCE_VIA_CONTRIBUTIONS";
       }
       if (systemPrompt.includes("bands_breached: true")) {
-        return "FULL_REBALANCE";
+        return "REBALANCE";
       }
       return "DO_NOTHING";
     };
 
+    const recommendation_type = pickRecommendation();
+    const decision_summary =
+      recommendation_type === "ASK_CLARIFYING_QUESTIONS"
+        ? "Missing inputs; please provide portfolio weights and cash flows."
+        : recommendation_type === "DEFER_AND_REVIEW"
+          ? "Defer and review required before proceeding."
+          : "Decision follows the investment policy guardrails.";
+
     return JSON.stringify({
-      recommendation_type: pickRecommendation(),
+      recommendation_type,
       recommendation_summary: "Policy-aligned recommendation based on provided inputs.",
       proposed_actions: [],
       explanation: {
-        decision_summary: "Decision follows the investment policy guardrails.",
+        decision_summary,
         relevant_portfolio_state: "Inputs were parsed from the request.",
-        policy_basis: "Policy targets and bands govern rebalancing decisions.",
+        policy_basis:
+          "Targets: equities 0.8, bonds 0.15, cash 0.05. Bands: equities 0.05, bonds 0.04, cash 0.02. Policy ape-policy v0.1-test (test).",
         reasoning_and_tradeoffs: "Guardrails prevent unnecessary action.",
         uncertainty_and_confidence: "High confidence given deterministic inputs.",
         next_review_or_trigger: "Review if inputs or cash flows change.",
@@ -59,6 +74,10 @@ vi.mock("@/lib/infra/mastra", () => ({
     });
   }),
 }));
+
+beforeEach(() => {
+  forcedResponse = null;
+});
 
 describe("runDecision", () => {
   it("asks for clarification when portfolio state is missing (scenario 1)", async () => {
@@ -141,7 +160,7 @@ describe("runDecision", () => {
     });
   });
 
-  it("recommends full rebalance when drift is out of band and no cash flows (scenario 3)", async () => {
+  it("recommends rebalance when drift is out of band and no cash flows (scenario 3)", async () => {
     const result = await runDecision({
       messages: [
         {
@@ -152,7 +171,7 @@ describe("runDecision", () => {
       ],
     });
 
-    expect(result.snapshot.recommendation.type).toBe("FULL_REBALANCE");
+    expect(result.snapshot.recommendation.type).toBe("REBALANCE");
   });
 
   it("recommends rebalancing via contributions when drift is out of band with contributions (scenario 4)", async () => {
@@ -181,5 +200,178 @@ describe("runDecision", () => {
     });
 
     expect(result.snapshot.recommendation.type).toBe("DO_NOTHING");
+  });
+
+  it("recommends rebalancing via contributions when in-band with contributions (3c prompt C)", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate against policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. Planned contribution: £2,000.",
+        },
+      ],
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("REBALANCE_VIA_CONTRIBUTIONS");
+  });
+
+  it("keeps DO_NOTHING regardless of prompt tone (prompt invariance)", async () => {
+    const neutral = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+        },
+      ],
+    });
+
+    const emotional = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Please, I am really worried and want action. Evaluate my portfolio: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+        },
+      ],
+    });
+
+    expect(neutral.snapshot.recommendation.type).toBe("DO_NOTHING");
+    expect(emotional.snapshot.recommendation.type).toBe("DO_NOTHING");
+  });
+
+  it("downgrades when model returns an unknown recommendation type", async () => {
+    forcedResponse = JSON.stringify({
+      recommendation_type: "GO_ALL_IN",
+      recommendation_summary: "Invalid type.",
+      proposed_actions: [],
+      explanation: {
+        decision_summary: "Invalid type supplied.",
+        relevant_portfolio_state: "Inputs were parsed from the request.",
+        policy_basis:
+          "Targets: equities 0.8, bonds 0.15, cash 0.05. Bands: equities 0.05, bonds 0.04, cash 0.02.",
+        reasoning_and_tradeoffs: "Invalid type.",
+        uncertainty_and_confidence: "Low confidence.",
+        next_review_or_trigger: "Retry.",
+      },
+    });
+
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+        },
+      ],
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+  });
+
+  it("downgrades when required explanation fields are missing", async () => {
+    forcedResponse = JSON.stringify({
+      recommendation_type: "DO_NOTHING",
+      recommendation_summary: "Missing policy basis.",
+      proposed_actions: [],
+      explanation: {
+        decision_summary: "Decision follows the investment policy guardrails.",
+        relevant_portfolio_state: "Inputs were parsed from the request.",
+        policy_basis: "",
+        reasoning_and_tradeoffs: "Guardrails prevent unnecessary action.",
+        uncertainty_and_confidence: "High confidence.",
+        next_review_or_trigger: "Review if inputs change.",
+      },
+    });
+
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+        },
+      ],
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+  });
+
+  it("returns a safe snapshot when the model output is invalid JSON", async () => {
+    forcedResponse = "not-json";
+
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+        },
+      ],
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+    expect(result.snapshot.snapshot_id).toBeTruthy();
+  });
+
+  it("explains guardrail overrides in the snapshot explanation", async () => {
+    forcedResponse = JSON.stringify({
+      recommendation_type: "DO_NOTHING",
+      recommendation_summary: "No action.",
+      proposed_actions: [],
+      explanation: {
+        decision_summary: "Model tried to do nothing.",
+        relevant_portfolio_state: "Inputs were parsed from the request.",
+        policy_basis:
+          "Targets: equities 0.8, bonds 0.15, cash 0.05. Bands: equities 0.05, bonds 0.04, cash 0.02.",
+        reasoning_and_tradeoffs: "Model output prior to guardrails.",
+        uncertainty_and_confidence: "Medium confidence.",
+        next_review_or_trigger: "Review if inputs change.",
+      },
+    });
+
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate against policy. Portfolio state: Equities 90%, Bonds 8%, Cash 2%. No new cash flows.",
+        },
+      ],
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+    expect(result.snapshot.explanation.decision_summary).toContain("Guardrails override");
+  });
+
+  it("injects deterministic policy basis even when model response is generic", async () => {
+    forcedResponse = JSON.stringify({
+      recommendation_type: "DO_NOTHING",
+      recommendation_summary: "No action.",
+      proposed_actions: [],
+      explanation: {
+        decision_summary: "Within tolerance.",
+        relevant_portfolio_state: "Inputs were parsed from the request.",
+        policy_basis: "Policy allows no action.",
+        reasoning_and_tradeoffs: "No action needed.",
+        uncertainty_and_confidence: "High confidence.",
+        next_review_or_trigger: "Review if inputs change.",
+      },
+    });
+
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+        },
+      ],
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DO_NOTHING");
+    expect(result.snapshot.explanation.policy_basis).toContain("Targets: equities 0.8");
+    expect(result.snapshot.explanation.policy_basis).toContain("Bands: equities 0.05");
   });
 });

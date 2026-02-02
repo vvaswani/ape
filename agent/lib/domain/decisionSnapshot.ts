@@ -9,9 +9,8 @@
 
 export type RecommendationType =
   | "DO_NOTHING"
+  | "REBALANCE"
   | "REBALANCE_VIA_CONTRIBUTIONS"
-  | "PARTIAL_REBALANCE"
-  | "FULL_REBALANCE"
   | "DEFER_AND_REVIEW"
   | "ASK_CLARIFYING_QUESTIONS";
 
