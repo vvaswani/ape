@@ -7,7 +7,9 @@
  * Keeping these in one place prevents "UI shapes the protocol" drift.
  */
 
+import type { AuthorityContext } from "@/lib/domain/authority";
 import type { PortfolioStateInput } from "@/lib/domain/portfolioState";
+import type { RiskInputs } from "@/lib/domain/riskInputs";
 
 /**
  * A supported chat role for multi-turn conversation.
@@ -44,6 +46,16 @@ export interface ChatRequest {
    * If present, it becomes authoritative factual input for drift computation.
    */
   portfolio_state?: PortfolioStateInput;
+
+  /**
+   * Optional structured risk inputs used for deterministic guardrail checks.
+   */
+  risk_inputs?: RiskInputs;
+
+  /**
+   * Optional authority context for approval/execution boundary enforcement.
+   */
+  authority?: AuthorityContext;
 }
 
 /**

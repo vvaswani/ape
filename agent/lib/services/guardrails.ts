@@ -14,8 +14,10 @@
 
 import type { PolicyJson } from "@/lib/infra/policyLoader";
 import type { DriftResult } from "@/lib/services/drift";
+import type { AuthorityContext } from "@/lib/domain/authority";
 import type { PortfolioStateInput } from "@/lib/domain/portfolioState";
 import type { RecommendationType } from "@/lib/domain/decisionSnapshot";
+import type { RiskInputs } from "@/lib/domain/riskInputs";
 
 /**
  * @description Minimal structured shape expected from the model (after JSON parsing).
@@ -65,6 +67,8 @@ export interface GuardrailContext {
   policy: PolicyJson;
   portfolio_state: PortfolioStateInput | null;
   drift: DriftResult | null;
+  risk_inputs: RiskInputs | null;
+  authority: AuthorityContext;
 }
 
 /**
@@ -74,6 +78,106 @@ export interface GuardrailOutcome {
   model: ModelDecision;
   warnings: string[];
   overridden: boolean;
+}
+
+export type RiskGuardrailStatus = "OK" | "MISSING_INPUTS" | "BREACH" | "POLICY_MISSING";
+
+export interface RiskGuardrailEvaluation {
+  status: RiskGuardrailStatus;
+  warnings: string[];
+  override_type: RecommendationType | null;
+  drawdown_limit: number | null;
+  drawdown_observed: number | null;
+  drawdown_breached: boolean | null;
+  risk_capacity_breached: boolean | null;
+}
+
+export function missingRiskOverrideType(hasState: boolean): RecommendationType {
+  return hasState ? "DEFER_AND_REVIEW" : "ASK_CLARIFYING_QUESTIONS";
+}
+
+export function evaluateRiskGuardrails(args: {
+  policy: PolicyJson;
+  risk_inputs: RiskInputs | null;
+  has_state: boolean;
+}): RiskGuardrailEvaluation {
+  const warnings: string[] = [];
+  const guardrails = args.policy.risk_guardrails;
+
+  if (!guardrails) {
+    warnings.push("risk_guardrails missing from policy.");
+    return {
+      status: "POLICY_MISSING",
+      warnings,
+      override_type: "DEFER_AND_REVIEW",
+      drawdown_limit: null,
+      drawdown_observed: null,
+      drawdown_breached: null,
+      risk_capacity_breached: null,
+    };
+  }
+
+  const drawdown_limit = guardrails.max_rolling_12m_drawdown_pct;
+  const drawdown_observed = args.risk_inputs?.rolling_12m_drawdown_pct ?? null;
+  const risk_capacity_breached = args.risk_inputs?.risk_capacity_breached ?? null;
+
+  const missingDrawdown = !isFiniteNumber(drawdown_observed);
+  const rule = guardrails.risk_capacity_rule;
+
+  if (rule !== "RISK_CAPACITY_OVERRIDES_TOLERANCE") {
+    warnings.push(`Unknown risk_capacity_rule: ${rule}`);
+    return {
+      status: "POLICY_MISSING",
+      warnings,
+      override_type: "DEFER_AND_REVIEW",
+      drawdown_limit,
+      drawdown_observed,
+      drawdown_breached: null,
+      risk_capacity_breached: risk_capacity_breached ?? null,
+    };
+  }
+
+  const missingRiskCapacity = typeof risk_capacity_breached !== "boolean";
+
+  if (missingDrawdown || missingRiskCapacity) {
+    warnings.push("Required risk inputs missing.");
+    return {
+      status: "MISSING_INPUTS",
+      warnings,
+      override_type: missingRiskOverrideType(args.has_state),
+      drawdown_limit,
+      drawdown_observed,
+      drawdown_breached: null,
+      risk_capacity_breached: typeof risk_capacity_breached === "boolean" ? risk_capacity_breached : null,
+    };
+  }
+
+  const EPS = 1e-6;
+  const drawdown_breached = drawdown_observed - drawdown_limit > EPS;
+  const breached = drawdown_breached || risk_capacity_breached === true;
+
+  if (breached) {
+    warnings.push("Risk guardrail breach detected.");
+    return {
+      status: "BREACH",
+      warnings,
+      override_type: "DEFER_AND_REVIEW",
+      drawdown_limit,
+      drawdown_observed,
+      drawdown_breached,
+      risk_capacity_breached,
+    };
+  }
+
+  return {
+    status: "OK",
+    warnings,
+    override_type: null,
+    drawdown_limit,
+    drawdown_observed,
+    drawdown_breached,
+    risk_capacity_breached,
+  };
 }
 
 /**
@@ -143,7 +247,53 @@ export function applyGuardrails(ctx: GuardrailContext, modelIn: ModelDecision): 
     );
     model.proposed_actions = [];
 
-    return { model, warnings, overridden };
+    return { model: sanitizeModelText(model, ctx.policy.constraints?.prohibited_actions ?? []), warnings, overridden };
+  }
+
+  if (!ctx.policy.constraints || !Array.isArray(ctx.policy.constraints.prohibited_actions)) {
+    warnings.push("Policy constraints missing; prohibited actions cannot be enforced.");
+    overridden = true;
+    model = forceDefer(model, "Policy constraints missing; cannot enforce prohibited actions.");
+    model.proposed_actions = [];
+    return { model: sanitizeModelText(model, []), warnings, overridden };
+  }
+
+  const authorityViolation = evaluateAuthority(ctx.authority);
+  if (authorityViolation) {
+    warnings.push(authorityViolation);
+    overridden = true;
+    model = forceDefer(model, "Authority violation: approval/execution requires SYSTEM role.");
+    model.proposed_actions = [];
+    return { model: sanitizeModelText(model, ctx.policy.constraints.prohibited_actions), warnings, overridden };
+  }
+
+  const prohibitedMatches = findProhibitedActionMatches(
+    ctx.policy.constraints.prohibited_actions,
+    model
+  );
+  if (prohibitedMatches.length > 0) {
+    warnings.push("Prohibited action detected in model output.");
+    overridden = true;
+    model = forceDefer(model, "Prohibited action detected; override applied.");
+    model.proposed_actions = [];
+    return { model: sanitizeModelText(model, ctx.policy.constraints.prohibited_actions), warnings, overridden };
+  }
+
+  const riskEval = evaluateRiskGuardrails({
+    policy: ctx.policy,
+    risk_inputs: ctx.risk_inputs,
+    has_state: hasState,
+  });
+
+  if (riskEval.override_type) {
+    warnings.push(...riskEval.warnings);
+    overridden = true;
+    model =
+      riskEval.override_type === "ASK_CLARIFYING_QUESTIONS"
+        ? forceAsk(model, "Risk inputs missing; clarify drawdown and risk capacity.")
+        : forceDefer(model, "Risk guardrails require defer and review.");
+    model.proposed_actions = [];
+    return { model: sanitizeModelText(model, ctx.policy.constraints.prohibited_actions), warnings, overridden };
   }
 
   // Cash flows (optional but part of PortfolioStateInput)
@@ -238,7 +388,11 @@ export function applyGuardrails(ctx: GuardrailContext, modelIn: ModelDecision): 
     model.proposed_actions = [];
   }
 
-  return { model, warnings, overridden };
+  return {
+    model: sanitizeModelText(model, ctx.policy.constraints.prohibited_actions),
+    warnings,
+    overridden,
+  };
 }
 
 /**
@@ -266,4 +420,103 @@ function forceDefer(model: ModelDecision, reason: string): ModelDecision {
       next_review_or_trigger: "Provide missing constraints/inputs and retry.",
     },
   };
+}
+
+function forceAsk(model: ModelDecision, reason: string): ModelDecision {
+  return {
+    ...model,
+    recommendation_type: "ASK_CLARIFYING_QUESTIONS",
+    recommendation_summary: "Additional inputs required before a recommendation can be made.",
+    explanation: {
+      ...model.explanation,
+      decision_summary: reason,
+      uncertainty_and_confidence: "High uncertainty due to missing risk inputs.",
+      next_review_or_trigger: "Provide drawdown and risk capacity inputs to proceed.",
+    },
+  };
+}
+
+function isFiniteNumber(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+export function evaluateAuthority(authority: AuthorityContext): string | null {
+  if (
+    (authority.decision_intent === "APPROVE" || authority.decision_intent === "EXECUTE") &&
+    authority.actor_role !== "SYSTEM"
+  ) {
+    return "Unauthorized approval/execution attempt detected.";
+  }
+  return null;
+}
+
+function findProhibitedActionMatches(
+  prohibited: string[],
+  model: ModelDecision
+): string[] {
+  const matches: string[] = [];
+  const texts: string[] = [
+    model.recommendation_summary,
+    model.explanation.decision_summary,
+    model.explanation.relevant_portfolio_state,
+    model.explanation.policy_basis,
+    model.explanation.reasoning_and_tradeoffs,
+    model.explanation.uncertainty_and_confidence,
+    model.explanation.next_review_or_trigger,
+    ...(model.proposed_actions ?? []).map((a) => a.rationale),
+  ];
+
+  for (const term of prohibited) {
+    const normalizedTerm = normalizeTerm(term);
+    for (const text of texts) {
+      if (text && normalizeText(text).includes(normalizedTerm)) {
+        matches.push(term);
+        break;
+      }
+    }
+  }
+
+  return matches;
+}
+
+function sanitizeModelText(model: ModelDecision, prohibited: string[]): ModelDecision {
+  if (prohibited.length === 0) return model;
+
+  const sanitize = (text: string): string => redactProhibitedTerms(text, prohibited);
+  const proposed = (model.proposed_actions ?? []).map((a) => ({
+    ...a,
+    rationale: sanitize(a.rationale),
+  }));
+
+  return {
+    ...model,
+    recommendation_summary: sanitize(model.recommendation_summary),
+    explanation: {
+      decision_summary: sanitize(model.explanation.decision_summary),
+      relevant_portfolio_state: sanitize(model.explanation.relevant_portfolio_state),
+      policy_basis: sanitize(model.explanation.policy_basis),
+      reasoning_and_tradeoffs: sanitize(model.explanation.reasoning_and_tradeoffs),
+      uncertainty_and_confidence: sanitize(model.explanation.uncertainty_and_confidence),
+      next_review_or_trigger: sanitize(model.explanation.next_review_or_trigger),
+    },
+    proposed_actions: proposed,
+  };
+}
+
+function normalizeText(text: string): string {
+  return text.toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim();
+}
+
+function normalizeTerm(term: string): string {
+  return term.toUpperCase().replace(/_/g, " ").trim();
+}
+
+function redactProhibitedTerms(text: string, prohibited: string[]): string {
+  let output = text;
+  for (const term of prohibited) {
+    const parts = term.split("_").map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    const pattern = new RegExp(parts.join("[\\s_-]+"), "gi");
+    output = output.replace(pattern, "REDACTED");
+  }
+  return output;
 }

@@ -18,13 +18,20 @@ import crypto from "node:crypto";
 
 import type { ChatRequest } from "@/lib/domain/chat";
 import type { DecisionSnapshot, RecommendationType } from "@/lib/domain/decisionSnapshot";
+import type { AuthorityContext } from "@/lib/domain/authority";
 import type { PortfolioStateInput } from "@/lib/domain/portfolioState";
+import type { RiskInputs } from "@/lib/domain/riskInputs";
 import type { PolicyJson } from "@/lib/infra/policyLoader";
 
 import { loadPolicy } from "@/lib/infra/policyLoader";
 import { generateAssistantReply } from "@/lib/infra/mastra";
 import { computeDrift } from "@/lib/services/drift";
-import { applyGuardrails, type ModelDecision } from "@/lib/services/guardrails";
+import {
+  applyGuardrails,
+  evaluateAuthority,
+  evaluateRiskGuardrails,
+  type ModelDecision,
+} from "@/lib/services/guardrails";
 
 const SNAPSHOT_VERSION = "0.3";
 const EPS = 1e-6;
@@ -219,6 +226,13 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
     ? null
     : structuredState ?? parsedState ?? null;
 
+  const authority: AuthorityContext = req.authority ?? {
+    actor_role: "USER",
+    decision_intent: "ADVISE",
+  };
+
+  const riskInputs: RiskInputs | null = req.risk_inputs ?? null;
+
   /**
    * ------------------------------------------------------------------
    * Deterministic drift computation (ONLY if state exists)
@@ -230,13 +244,27 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
   const pendingWithdraw = state?.cash_flows.pending_withdrawals_gbp ?? null;
   const hasCashFlows = (pendingContrib ?? 0) > 0 || (pendingWithdraw ?? 0) > 0;
 
-  const expectedRecommendationType: RecommendationType = !state || !driftResult
+  const baseRecommendationType: RecommendationType = !state || !driftResult
     ? "ASK_CLARIFYING_QUESTIONS"
     : hasCashFlows
       ? "REBALANCE_VIA_CONTRIBUTIONS"
       : driftResult.bands_breached
         ? "REBALANCE"
         : "DO_NOTHING";
+
+  const authorityViolation = evaluateAuthority(authority);
+  const riskEval = evaluateRiskGuardrails({
+    policy,
+    risk_inputs: riskInputs,
+    has_state: !!state,
+  });
+
+  const preflightOverride: RecommendationType | null = authorityViolation
+    ? "DEFER_AND_REVIEW"
+    : riskEval.override_type ?? null;
+
+  const expectedRecommendationType: RecommendationType =
+    preflightOverride ?? baseRecommendationType;
 
   /**
    * ------------------------------------------------------------------
@@ -460,6 +488,8 @@ Portfolio state has NOT been provided.
       policy,
       portfolio_state: state,
       drift: driftResult,
+      risk_inputs: riskInputs,
+      authority,
     },
     modelDecision
   );
@@ -572,8 +602,9 @@ Portfolio state has NOT been provided.
         bands_breached: driftResult ? driftResult.bands_breached : null,
       },
       risk_checks: {
-        risk_capacity_breached: null,
-        notes: "Risk checks not implemented in Milestone #3b.",
+        drawdown_proximity: formatDrawdownNote(riskEval),
+        risk_capacity_breached: riskEval.risk_capacity_breached,
+        notes: formatRiskNotes(riskEval, authorityViolation),
       },
     },
 
@@ -614,6 +645,8 @@ Portfolio state has NOT been provided.
         usedFallback ? "Model JSON invalid: used fallback before guardrails." : null,
         guard.overridden ? "Guardrails overrode model output." : null,
         guard.warnings.length ? `Guardrails warnings: ${guard.warnings.join(" | ")}` : null,
+        authorityViolation ? "Authority guardrail enforced." : null,
+        riskEval.status !== "OK" ? `Risk guardrails status: ${riskEval.status}.` : null,
         contract.overridden ? "Explanation contract forced DEFER_AND_REVIEW." : null,
         contract.warnings.length ? `Explanation warnings: ${contract.warnings.join(" | ")}` : null,
         auditWarnings.length ? `Input warnings: ${auditWarnings.join(" | ")}` : null,
@@ -799,4 +832,32 @@ function downgradeToDefer(model: ModelDecision, policy: PolicyJson, reason: stri
       next_review_or_trigger: "Fix explanation contract and retry.",
     },
   };
+}
+
+function formatDrawdownNote(riskEval: ReturnType<typeof evaluateRiskGuardrails>): string {
+  if (riskEval.drawdown_observed === null || riskEval.drawdown_limit === null) {
+    return "Rolling 12-month drawdown input missing.";
+  }
+  return `Rolling 12-month drawdown ${riskEval.drawdown_observed} vs limit ${riskEval.drawdown_limit}.`;
+}
+
+function formatRiskNotes(
+  riskEval: ReturnType<typeof evaluateRiskGuardrails>,
+  authorityViolation: string | null
+): string {
+  if (authorityViolation) {
+    return "Authority violation detected; decision deferred.";
+  }
+  switch (riskEval.status) {
+    case "OK":
+      return "Risk guardrails satisfied.";
+    case "MISSING_INPUTS":
+      return "Risk inputs missing; guardrails enforced safe fallback.";
+    case "BREACH":
+      return "Risk guardrail breach detected; decision deferred.";
+    case "POLICY_MISSING":
+      return "Risk guardrails missing or invalid; decision deferred.";
+    default:
+      return "Risk guardrails evaluated.";
+  }
 }

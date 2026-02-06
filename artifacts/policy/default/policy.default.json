@@ -69,6 +69,7 @@
 
   "meta": {
     "derived_from_ipm_version": "0.1-default",
+    "prime_directive_sha256": "c83b9f64a9c49b30bfbaa1c120560f0badb43b03fedcbf717c62c8f752c90346",
     "notes": "Safe default runtime policy when no local policy is present."
   }
 }
