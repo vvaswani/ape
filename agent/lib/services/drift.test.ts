@@ -13,8 +13,18 @@ const basePolicy: PolicyJson = {
     base_currency: "GBP",
     target_weights: { EQUITIES: 0.6, BONDS: 0.3, CASH: 0.1 },
   },
+  risk_guardrails: {
+    max_rolling_12m_drawdown_pct: 0.2,
+    risk_capacity_rule: "RISK_CAPACITY_OVERRIDES_TOLERANCE",
+  },
   rebalancing_policy: {
     absolute_bands: { EQUITIES: 0.05, BONDS: 0.05, CASH: 0.05 },
+  },
+  constraints: {
+    prohibited_actions: ["LEVERAGE"],
+  },
+  meta: {
+    prime_directive_sha256: "test",
   },
 };
 

@@ -18,12 +18,19 @@ vi.mock("@/lib/infra/policyLoader", () => ({
         CASH: 0.05,
       },
     },
+    risk_guardrails: {
+      max_rolling_12m_drawdown_pct: 0.2,
+      risk_capacity_rule: "RISK_CAPACITY_OVERRIDES_TOLERANCE",
+    },
     rebalancing_policy: {
       absolute_bands: {
         EQUITIES: 0.05,
         BONDS: 0.04,
         CASH: 0.02,
       },
+    },
+    constraints: {
+      prohibited_actions: ["LEVERAGE", "MARGIN", "MARKET_TIMING"],
     },
   }),
 }));
@@ -78,6 +85,11 @@ vi.mock("@/lib/infra/mastra", () => ({
 beforeEach(() => {
   forcedResponse = null;
 });
+
+const defaultRiskInputs = {
+  rolling_12m_drawdown_pct: 0.1,
+  risk_capacity_breached: false,
+};
 
 describe("runDecision", () => {
   it("asks for clarification when portfolio state is missing (scenario 1)", async () => {
@@ -138,12 +150,16 @@ describe("runDecision", () => {
         request: {
           messages: [{ role: "user", content: basePrompt }],
           portfolio_state: formState,
+          risk_inputs: defaultRiskInputs,
         },
         expected: "DO_NOTHING",
       },
       {
         name: "Case C — prompt only",
-        request: { messages: [{ role: "user", content: promptWithWeights }] },
+        request: {
+          messages: [{ role: "user", content: promptWithWeights }],
+          risk_inputs: defaultRiskInputs,
+        },
         expected: "DO_NOTHING",
       },
       {
@@ -151,6 +167,7 @@ describe("runDecision", () => {
         request: {
           messages: [{ role: "user", content: promptWithWeights }],
           portfolio_state: conflictFormState,
+          risk_inputs: defaultRiskInputs,
         },
         expected: "ASK_CLARIFYING_QUESTIONS",
       },
@@ -169,6 +186,7 @@ describe("runDecision", () => {
             "Evaluate my portfolio against the current investment policy.\n\nPortfolio state:\n- Total value: £100,000\n- Asset allocation:\n  - Equities: 55%\n  - Bonds: 35%\n  - Cash: 10%\n\nThere are no new contributions or withdrawals planned.\n\nGenerate a decision snapshot and recommendation.",
         },
       ],
+      risk_inputs: defaultRiskInputs,
     });
 
     expect(result.snapshot.recommendation.type).toBe("REBALANCE");
@@ -183,6 +201,7 @@ describe("runDecision", () => {
             "Evaluate my portfolio against the current investment policy.\n\nPortfolio state:\n- Total value: £100,000\n- Asset allocation:\n  - Equities: 86%\n  - Bonds: 9%\n  - Cash: 5%\n\nCash flows:\n- Planned contribution: £5,000\n- No withdrawals\n\nGenerate a decision snapshot and recommendation.",
         },
       ],
+      risk_inputs: defaultRiskInputs,
     });
 
     expect(result.snapshot.recommendation.type).toBe("REBALANCE_VIA_CONTRIBUTIONS");
@@ -197,6 +216,7 @@ describe("runDecision", () => {
             "Evaluate my portfolio against the current investment policy.\n\nPortfolio state:\n- Total value: £100,000\n- Asset allocation:\n  - Equities: 81%\n  - Bonds: 14%\n  - Cash: 5%\n\nThere are no new contributions or withdrawals.\n\nIf action is not justified by policy, explicitly recommend inaction.\nGenerate a decision snapshot.",
         },
       ],
+      risk_inputs: defaultRiskInputs,
     });
 
     expect(result.snapshot.recommendation.type).toBe("DO_NOTHING");
@@ -211,6 +231,7 @@ describe("runDecision", () => {
             "Evaluate against policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. Planned contribution: £2,000.",
         },
       ],
+      risk_inputs: defaultRiskInputs,
     });
 
     expect(result.snapshot.recommendation.type).toBe("REBALANCE_VIA_CONTRIBUTIONS");
@@ -225,6 +246,7 @@ describe("runDecision", () => {
             "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
         },
       ],
+      risk_inputs: defaultRiskInputs,
     });
 
     const emotional = await runDecision({
@@ -235,6 +257,7 @@ describe("runDecision", () => {
             "Please, I am really worried and want action. Evaluate my portfolio: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
         },
       ],
+      risk_inputs: defaultRiskInputs,
     });
 
     expect(neutral.snapshot.recommendation.type).toBe("DO_NOTHING");
@@ -265,6 +288,7 @@ describe("runDecision", () => {
             "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
         },
       ],
+      risk_inputs: defaultRiskInputs,
     });
 
     expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
@@ -293,6 +317,7 @@ describe("runDecision", () => {
             "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
         },
       ],
+      risk_inputs: defaultRiskInputs,
     });
 
     expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
@@ -309,6 +334,7 @@ describe("runDecision", () => {
             "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
         },
       ],
+      risk_inputs: defaultRiskInputs,
     });
 
     expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
@@ -339,6 +365,7 @@ describe("runDecision", () => {
             "Evaluate against policy. Portfolio state: Equities 90%, Bonds 8%, Cash 2%. No new cash flows.",
         },
       ],
+      risk_inputs: defaultRiskInputs,
     });
 
     expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
@@ -368,6 +395,7 @@ describe("runDecision", () => {
             "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
         },
       ],
+      risk_inputs: defaultRiskInputs,
     });
 
     expect(result.snapshot.recommendation.type).toBe("DO_NOTHING");
