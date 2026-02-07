@@ -22,6 +22,7 @@
 - **UI / Client:** Collects chat + structured `portfolio_state`, renders chat as supportive UX, and treats Decision Snapshot as authoritative output.
 - **API / Service layer:** `POST /api/chat` validates request shape, orchestrates decision flow, applies guardrails, and emits snapshot.
 - **Data store(s):** File-based policy/config artifacts (`artifacts/policy/default/*`, optional `artifacts/local/*`) are source of truth; no DB through Milestone 3c.
+At runtime, policy must be provided via explicit configuration; repo artifacts are not valid runtime dependencies.
 - **Integrations:** LLM generation via Mastra agent abstraction; policy and explanation contract loaded from artifacts.
 - **Jobs / schedulers (if any):** None in current scope.
 

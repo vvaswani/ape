@@ -59,6 +59,63 @@ function firstExisting(paths: string[]): string | null {
   return null;
 }
 
+function resolvePolicyPathFromEnv(): string | null {
+  const policyPathEnv = process.env.POLICY_PATH?.trim();
+  if (policyPathEnv && policyPathEnv.length > 0) {
+    return path.isAbsolute(policyPathEnv) ? policyPathEnv : path.resolve(process.cwd(), policyPathEnv);
+  }
+
+  const policyDir = process.env.POLICY_DIR?.trim();
+  if (policyDir && policyDir.length > 0) {
+    const baseDir = path.isAbsolute(policyDir) ? policyDir : path.resolve(process.cwd(), policyDir);
+    const candidates = [
+      path.join(baseDir, "policy.local.json"),
+      path.join(baseDir, "policy.default.json"),
+    ];
+    return firstExisting(candidates);
+  }
+
+  return null;
+}
+
+function resolvePrimeDirectivePath(args: {
+  policyPath: string;
+  allowArtifacts: boolean;
+}): string | null {
+  const { policyPath, allowArtifacts } = args;
+  const policyDirEnv = process.env.POLICY_DIR?.trim();
+  const policyDir = policyDirEnv
+    ? path.isAbsolute(policyDirEnv)
+      ? policyDirEnv
+      : path.resolve(process.cwd(), policyDirEnv)
+    : path.dirname(policyPath);
+
+  const isLocal = policyPath.includes("policy.local.json");
+  const localFirst = isLocal
+    ? ["prime_directive.local.md", "prime_directive.default.md"]
+    : ["prime_directive.default.md", "prime_directive.local.md"];
+
+  const candidates = localFirst.map((name) => path.join(policyDir, name));
+
+  if (allowArtifacts) {
+    const cwd = process.cwd();
+    const artifactCandidates = isLocal
+      ? [
+          path.resolve(cwd, "artifacts/local/prime_directive.local.md"),
+          path.resolve(cwd, "..", "artifacts/local/prime_directive.local.md"),
+          "/artifacts/local/prime_directive.local.md",
+        ]
+      : [
+          path.resolve(cwd, "artifacts/policy/default/prime_directive.default.md"),
+          path.resolve(cwd, "..", "artifacts/policy/default/prime_directive.default.md"),
+          "/artifacts/policy/default/prime_directive.default.md",
+        ];
+    candidates.push(...artifactCandidates);
+  }
+
+  return firstExisting(candidates);
+}
+
 function sha256File(absPath: string): string {
   const raw = fs.readFileSync(absPath);
   return crypto.createHash("sha256").update(raw).digest("hex");
@@ -67,29 +124,16 @@ function sha256File(absPath: string): string {
 function enforcePrimeDirectiveFreeze(args: {
   policy: PolicyJson;
   policyPath: string;
+  allowArtifacts: boolean;
 }): void {
-  const { policy, policyPath } = args;
+  const { policy, policyPath, allowArtifacts } = args;
   const expected = policy.meta?.prime_directive_sha256;
 
   if (!expected || typeof expected !== "string" || expected.trim().length === 0) {
     throw new Error("Prime Directive pin missing: meta.prime_directive_sha256 must be set.");
   }
 
-  const isLocal = policyPath.includes("artifacts\\local") || policyPath.includes("artifacts/local");
-  const cwd = process.cwd();
-  const primeCandidates = isLocal
-    ? [
-        path.resolve(cwd, "artifacts/local/prime_directive.local.md"),
-        path.resolve(cwd, "..", "artifacts/local/prime_directive.local.md"),
-        "/artifacts/local/prime_directive.local.md",
-      ]
-    : [
-        path.resolve(cwd, "artifacts/policy/default/prime_directive.default.md"),
-        path.resolve(cwd, "..", "artifacts/policy/default/prime_directive.default.md"),
-        "/artifacts/policy/default/prime_directive.default.md",
-      ];
-
-  const primePath = firstExisting(primeCandidates);
+  const primePath = resolvePrimeDirectivePath({ policyPath, allowArtifacts });
   if (!primePath) {
     throw new Error("Prime Directive not found for governance freeze check.");
   }
@@ -106,40 +150,35 @@ function enforcePrimeDirectiveFreeze(args: {
  * Load the policy JSON.
  *
  * Resolution order:
- * 1) artifacts/local/policy.local.json
- * 2) artifacts/policy/default/policy.default.json
- *
- * Supports both:
- * - agent/artifacts/...
- * - repo-root/artifacts/...
+ * 1) POLICY_PATH (explicit file path)
+ * 2) POLICY_DIR (directory with policy.local.json or policy.default.json)
+ * 3) Optional legacy artifacts fallback if ALLOW_ARTIFACTS_READ=true
  */
 export function loadPolicy(): PolicyJson {
-  const cwd = process.cwd();
-  const localCandidates = [
-    path.resolve(cwd, "artifacts/local/policy.local.json"),
-    path.resolve(cwd, "..", "artifacts/local/policy.local.json"),
-    "/artifacts/local/policy.local.json",
-  ];
+  const allowArtifacts = process.env.ALLOW_ARTIFACTS_READ === "true";
+  const envResolved = resolvePolicyPathFromEnv();
 
-  const defaultCandidates = [
-    path.resolve(cwd, "artifacts/policy/default/policy.default.json"),
-    path.resolve(cwd, "..", "artifacts/policy/default/policy.default.json"),
-    "/artifacts/policy/default/policy.default.json",
-  ];
-
-  const localPath = firstExisting(localCandidates);
-  if (localPath) {
-    const policy = readJson<PolicyJson>(localPath);
-    enforcePrimeDirectiveFreeze({ policy, policyPath: localPath });
-    return policy;
+  let policyPath = envResolved;
+  if (!policyPath && allowArtifacts) {
+    const cwd = process.cwd();
+    const legacyCandidates = [
+      path.resolve(cwd, "artifacts/local/policy.local.json"),
+      path.resolve(cwd, "..", "artifacts/local/policy.local.json"),
+      "/artifacts/local/policy.local.json",
+      path.resolve(cwd, "artifacts/policy/default/policy.default.json"),
+      path.resolve(cwd, "..", "artifacts/policy/default/policy.default.json"),
+      "/artifacts/policy/default/policy.default.json",
+    ];
+    policyPath = firstExisting(legacyCandidates);
   }
 
-  const defaultPath = firstExisting(defaultCandidates);
-  if (!defaultPath) {
-    throw new Error("Policy JSON not found (local or default).");
+  if (!policyPath) {
+    throw new Error(
+      "Policy JSON not found. Set POLICY_PATH or POLICY_DIR (or enable ALLOW_ARTIFACTS_READ=true for legacy artifacts)."
+    );
   }
 
-  const policy = readJson<PolicyJson>(defaultPath);
-  enforcePrimeDirectiveFreeze({ policy, policyPath: defaultPath });
+  const policy = readJson<PolicyJson>(policyPath);
+  enforcePrimeDirectiveFreeze({ policy, policyPath, allowArtifacts });
   return policy;
 }
