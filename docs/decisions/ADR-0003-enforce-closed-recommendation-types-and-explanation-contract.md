@@ -31,5 +31,5 @@ Constrain recommendations to a closed enum and run model output through explanat
 
 ## Links
 - Related commits: `8b53e87`, `df4ec33`, `d0485ac`, `1c5a7f8`.
-- Evidence: `agent/lib/domain/decisionSnapshot.ts`, `agent/lib/services/decisionService.ts`, `agent/lib/services/decisionService.test.ts`, `docs/tests/milestone-3c/README.md`, `docs/tests/milestone-3c/scenario-5-prompt-invariance.md`.
-- Related docs: `docs/milestones/milestone-3c.md`, `docs/milestones/milestone-3c-dod.md`.
+- Evidence: `agent/lib/domain/decisionSnapshot.ts`, `agent/lib/services/decisionService.ts`, `agent/lib/services/decisionService.test.ts`, `docs/tests/milestone-3c/README.md`, `docs/tests/milestone-3c/SCENARIO_5_PROMPT_INVARIANCE.md`.
+- Related docs: `docs/milestones/MILESTONE_3C.md`, `docs/milestones/MILESTONE_3C_DOD.md`.

@@ -32,4 +32,4 @@ Treat deterministic portfolio evaluation (policy loading, drift math, contradict
 ## Links
 - Related commits: `7decfba`, `4e47677`, `834dade`.
 - Evidence: `agent/lib/services/decisionService.ts`, `agent/lib/services/drift.ts`, `agent/lib/services/guardrails.ts`, `agent/lib/services/decisionService.test.ts`.
-- Related docs: `docs/milestones/milestone-3b.md`, `docs/tests/milestone-3b/README.md`.
+- Related docs: `docs/milestones/MILESTONE_3B.md`, `docs/tests/milestone-3b/README.md`.

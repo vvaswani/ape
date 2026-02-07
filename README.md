@@ -102,9 +102,7 @@ If you need to share something, prefer adding it under:
 For anything large or sensitive, attach it to the ticket/PR instead of committing it.
 
 
-## Docs -- TODO
+## Docs
 
-* Decision API spec
-* Artifacts conventions
-* Policy file conventions
+See `docs/README.md` for the canonical documentation index.
 

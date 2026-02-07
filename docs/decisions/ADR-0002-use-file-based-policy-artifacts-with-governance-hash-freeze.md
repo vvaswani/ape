@@ -32,4 +32,4 @@ Load policy from file artifacts using local-override-first resolution (`artifact
 ## Links
 - Related commits: `736e43f`.
 - Evidence: `agent/lib/infra/policyLoader.ts`, `agent/lib/infra/policyLoader.test.ts`, `artifacts/policy/default/policy.default.json`, `artifacts/policy/default/prime_directive.default.md`.
-- Related docs: `docs/governance/prime-directive.md`.
+- Related docs: `docs/governance/PRIME_DIRECTIVE.md`.
