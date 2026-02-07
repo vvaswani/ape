@@ -15,9 +15,17 @@
  */
 
 import crypto from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 
 import type { ChatRequest } from "@/lib/domain/chat";
-import type { DecisionSnapshot, RecommendationType } from "@/lib/domain/decisionSnapshot";
+import type {
+  DecisionSnapshot,
+  OutcomeState,
+  PolicyItemReference,
+  RecommendationType,
+  SnapshotNotice,
+} from "@/lib/domain/decisionSnapshot";
 import type { AuthorityContext } from "@/lib/domain/authority";
 import type { PortfolioStateInput } from "@/lib/domain/portfolioState";
 import type { RiskInputs } from "@/lib/domain/riskInputs";
@@ -35,6 +43,48 @@ import {
 
 const SNAPSHOT_VERSION = "0.3";
 const EPS = 1e-6;
+
+const POLICY_CATALOGUE_PATHS = [
+  path.resolve(process.cwd(), "artifacts", "policy", "default", "decision-principles-catalogue.json"),
+  path.resolve(process.cwd(), "..", "artifacts", "policy", "default", "decision-principles-catalogue.json"),
+];
+
+function loadPolicyCatalogue(): PolicyItemReference[] {
+  for (const candidate of POLICY_CATALOGUE_PATHS) {
+    try {
+      const raw = readFileSync(candidate, "utf-8");
+      const parsed = JSON.parse(raw) as {
+        principles?: Array<{
+          question_id?: string;
+          ipm_mapping?: {
+            ipm_section_heading?: string;
+            ipm_field_key?: string;
+            ipm_clause_id?: string;
+          };
+        }>;
+      };
+      const principles = parsed.principles ?? [];
+      return principles
+        .filter((p) => typeof p.question_id === "string")
+        .map((p) => ({
+          dpq_id: p.question_id as string,
+          ipm_section_heading: p.ipm_mapping?.ipm_section_heading,
+          ipm_field_key: p.ipm_mapping?.ipm_field_key,
+          ipm_clause_id: p.ipm_mapping?.ipm_clause_id,
+        }));
+    } catch {
+      // Continue to next path.
+    }
+  }
+  return [];
+}
+
+const POLICY_ITEMS = loadPolicyCatalogue();
+
+function findPolicyItem(dpqId: string): PolicyItemReference | null {
+  const match = POLICY_ITEMS.find((p) => p.dpq_id === dpqId);
+  return match ?? null;
+}
 
 function extractLastUserMessage(messages: ChatRequest["messages"]): string | null {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -167,6 +217,76 @@ function describeFormState(state: PortfolioStateInput | undefined): string {
   return `missing: ${missing.join(", ")}`;
 }
 
+function listMissingInputs(state: PortfolioStateInput | null): Array<{ input_key: string; impact: string }> {
+  const missing: Array<{ input_key: string; impact: string }> = [];
+  if (!state) {
+    return [
+      { input_key: "portfolio_state.weights", impact: "Required to compute drift and recommendation." },
+      { input_key: "portfolio_state.cash_flows", impact: "Required to assess cashflow-driven rebalancing." },
+      { input_key: "portfolio_state.total_value", impact: "Required for sizing and validation." },
+    ];
+  }
+
+  if (state.weights.EQUITIES === null || state.weights.BONDS === null || state.weights.CASH === null) {
+    missing.push({
+      input_key: "portfolio_state.weights",
+      impact: "Required to compute drift and recommendation.",
+    });
+  }
+  if (state.cash_flows.pending_contributions_gbp === null || state.cash_flows.pending_withdrawals_gbp === null) {
+    missing.push({
+      input_key: "portfolio_state.cash_flows",
+      impact: "Required to assess cashflow-driven rebalancing.",
+    });
+  }
+  if (state.total_value_gbp === null) {
+    missing.push({
+      input_key: "portfolio_state.total_value",
+      impact: "Required for sizing and validation.",
+    });
+  }
+  return missing;
+}
+
+function outcomeFromRecommendation(type: RecommendationType): OutcomeState {
+  switch (type) {
+    case "DO_NOTHING":
+      return "RECOMMEND_NO_ACTION";
+    case "ASK_CLARIFYING_QUESTIONS":
+      return "CANNOT_DECIDE_MISSING_INPUTS";
+    case "DEFER_AND_REVIEW":
+      return "CANNOT_DECIDE_POLICY_GAP";
+    default:
+      return "RECOMMEND_ACTION";
+  }
+}
+
+function policyItemsForContext(args: {
+  hasAuthorityCheck: boolean;
+  hasDriftCheck: boolean;
+  hasCashflowCheck: boolean;
+  hasRiskCheck: boolean;
+}): PolicyItemReference[] {
+  const refs: PolicyItemReference[] = [];
+  if (args.hasAuthorityCheck) {
+    const item = findPolicyItem("DPQ-001");
+    if (item) refs.push(item);
+  }
+  if (args.hasDriftCheck) {
+    const item = findPolicyItem("DPQ-002");
+    if (item) refs.push(item);
+  }
+  if (args.hasCashflowCheck) {
+    const item = findPolicyItem("DPQ-003");
+    if (item) refs.push(item);
+  }
+  if (args.hasRiskCheck) {
+    const item = findPolicyItem("DPQ-004");
+    if (item) refs.push(item);
+  }
+  return refs;
+}
+
 /**
  * Main entry point for decision generation.
  */
@@ -175,7 +295,108 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
   const createdAt = new Date().toISOString();
 
   if (!Array.isArray(req.messages)) {
-    throw new Error("runDecision: messages must be an array");
+    const errorSnapshot: DecisionSnapshot = {
+      snapshot_id: snapshotId,
+      snapshot_version: SNAPSHOT_VERSION,
+      created_at: createdAt,
+      project: "AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator)",
+      outcome_state: "ERROR_NONRECOVERABLE",
+      inputs_observed: [],
+      inputs_missing: [],
+      policy_items_referenced: [],
+      warnings: [],
+      errors: [
+        {
+          code: "INVALID_REQUEST",
+          message: "messages must be an array",
+          fields: ["messages"],
+        },
+      ],
+      context: {
+        user_id: "local",
+        environment: "dev",
+        jurisdiction: "UK",
+        base_currency: "GBP",
+      },
+      inputs: {
+        portfolio_state: {
+          total_value: null,
+          asset_allocation: { EQUITIES: null, BONDS: null, CASH: null },
+          positions_summary: "Not provided.",
+          cash_balance: null,
+        },
+        cash_flows: {
+          pending_contributions: null,
+          pending_withdrawals: null,
+          notes: "Not provided.",
+        },
+        constraints: {
+          liquidity_needs: "Not captured yet.",
+          tax_or_wrapper_constraints: "Not captured yet.",
+          other_constraints: "Not captured yet.",
+        },
+        market_context: {
+          as_of_date: new Date().toISOString().slice(0, 10),
+          notes: "No exceptional market context assumed.",
+        },
+      },
+      governance: {
+        investment_policy: {
+          policy_id: "unknown",
+          policy_version: "unknown",
+          policy_source: "unknown",
+        },
+        explanation_contract: {
+          version: "0.1-default",
+        },
+      },
+      evaluation: {
+        drift_analysis: {
+          target_weights: { EQUITIES: 0, BONDS: 0, CASH: 0 },
+          actual_weights: { EQUITIES: null, BONDS: null, CASH: null },
+          absolute_drift: { EQUITIES: null, BONDS: null, CASH: null },
+          bands_breached: null,
+        },
+        risk_checks: {
+          drawdown_proximity: "Not evaluated.",
+          risk_capacity_breached: null,
+          notes: "Not evaluated.",
+        },
+      },
+      recommendation: {
+        type: "DEFER_AND_REVIEW",
+        summary: "Invalid request; unable to evaluate.",
+        proposed_actions: [],
+        turnover_estimate: {
+          gross_turnover_pct: null,
+          trade_count: null,
+        },
+      },
+      explanation: {
+        decision_summary: "Invalid request; missing messages array.",
+        relevant_portfolio_state: "No portfolio state.",
+        policy_basis: "Policy unavailable due to invalid request.",
+        reasoning_and_tradeoffs: "Cannot evaluate without a valid request payload.",
+        uncertainty_and_confidence: "High uncertainty due to invalid request.",
+        next_review_or_trigger: "Fix request payload and retry.",
+      },
+      user_acknowledgement: {
+        decision: "DEFER",
+        acknowledged_at: null,
+        user_notes: "Invalid request payload.",
+      },
+      outcome: {
+        implemented: null,
+        implementation_notes: null,
+        review_date: null,
+        observed_effects: null,
+      },
+      audit: {
+        logic_version: SNAPSHOT_VERSION,
+        notes: "Invalid request; snapshot generated for error reporting.",
+      },
+    };
+    return { snapshot: errorSnapshot };
   }
 
   /**
@@ -265,6 +486,13 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
 
   const expectedRecommendationType: RecommendationType =
     preflightOverride ?? baseRecommendationType;
+
+  const policyItems = policyItemsForContext({
+    hasAuthorityCheck: true,
+    hasDriftCheck: !!driftResult,
+    hasCashflowCheck: hasCashFlows,
+    hasRiskCheck: true,
+  });
 
   /**
    * ------------------------------------------------------------------
@@ -530,12 +758,86 @@ Portfolio state has NOT been provided.
    * Build Decision Snapshot
    * ------------------------------------------------------------------
    */
+  const missingInputs = listMissingInputs(state);
+  const outcomeState: OutcomeState =
+    missingInputs.length > 0 && (!state || expectedRecommendationType === "ASK_CLARIFYING_QUESTIONS")
+      ? "CANNOT_DECIDE_MISSING_INPUTS"
+      : outcomeFromRecommendation(finalModel.recommendation_type);
+  const warnings: SnapshotNotice[] = [];
+  const errors: SnapshotNotice[] = [];
+
+  if (outcomeState === "CANNOT_DECIDE_MISSING_INPUTS" && missingInputs.length === 0) {
+    warnings.push({
+      code: "MISSING_INPUTS_UNSPECIFIED",
+      message: "Missing inputs expected but none were recorded.",
+    });
+  }
+
+  if (riskEval.status === "POLICY_MISSING") {
+    warnings.push({
+      code: "POLICY_GAP_RISK_GUARDRAILS",
+      message: "Risk guardrails missing or invalid in policy.",
+      fields: ["policy.risk_guardrails"],
+    });
+  }
+
+  if (authorityViolation) {
+    warnings.push({
+      code: "AUTHORITY_VIOLATION",
+      message: authorityViolation,
+      fields: ["authority.actor_role", "authority.decision_intent"],
+    });
+  }
+
+  const inputsObserved = [
+    ...(state
+      ? [
+          { input_key: "portfolio_state.weights", value: "provided", source: "form" as const },
+          { input_key: "portfolio_state.cash_flows", value: "provided", source: "form" as const },
+          { input_key: "portfolio_state.total_value", value: state.total_value_gbp, source: "form" as const },
+        ]
+      : []),
+    ...(parsedState && !state
+      ? [
+          { input_key: "portfolio_state.weights", value: "provided", source: "prompt" as const },
+          { input_key: "portfolio_state.cash_flows", value: "provided", source: "prompt" as const },
+        ]
+      : []),
+    ...(riskInputs
+      ? [
+          {
+            input_key: "risk_inputs.rolling_12m_drawdown_pct",
+            value: riskInputs.rolling_12m_drawdown_pct ?? null,
+            source: "request" as const,
+          },
+          {
+            input_key: "risk_inputs.risk_capacity_breached",
+            value: riskInputs.risk_capacity_breached ?? null,
+            source: "request" as const,
+          },
+        ]
+      : []),
+    ...(authority
+      ? [
+          { input_key: "authority.actor_role", value: authority.actor_role, source: "request" as const },
+          { input_key: "authority.decision_intent", value: authority.decision_intent, source: "request" as const },
+        ]
+      : []),
+  ];
+
   const snapshot: DecisionSnapshot = {
     snapshot_id: snapshotId,
     snapshot_version: SNAPSHOT_VERSION,
     created_at: createdAt,
 
     project: "AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator)",
+
+    outcome_state: outcomeState,
+    inputs_observed: inputsObserved,
+    inputs_missing: outcomeState === "CANNOT_DECIDE_MISSING_INPUTS" ? missingInputs : [],
+    policy_items_referenced: policyItems,
+    warnings,
+    errors,
 
     context: {
       user_id: "local",
@@ -656,6 +958,13 @@ Portfolio state has NOT been provided.
         .join(" "),
     },
   };
+
+  if (outcomeState === "CANNOT_DECIDE_POLICY_GAP" && warnings.length === 0) {
+    warnings.push({
+      code: "POLICY_GAP",
+      message: "Decision deferred due to policy gap or guardrail override.",
+    });
+  }
 
   return { snapshot };
 }

@@ -1,0 +1,129 @@
+{
+  "snapshot_id": "00000000-0000-0000-0000-000000000000",
+  "snapshot_version": "0.3",
+  "created_at": "2026-02-08T00:00:00Z",
+  "project": "AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator)",
+  "outcome_state": "RECOMMEND_NO_ACTION",
+  "inputs_observed": [
+    {
+      "input_key": "portfolio_state.weights",
+      "value": "provided",
+      "source": "form"
+    },
+    {
+      "input_key": "portfolio_state.cash_flows",
+      "value": "provided",
+      "source": "form"
+    }
+  ],
+  "inputs_missing": [],
+  "policy_items_referenced": [
+    {
+      "dpq_id": "DPQ-002",
+      "ipm_section_heading": "Rebalancing Philosophy",
+      "ipm_field_key": "rebalancing.philosophy",
+      "ipm_clause_id": "IPM-RBP-001"
+    }
+  ],
+  "warnings": [],
+  "errors": [],
+  "context": {
+    "user_id": "sample",
+    "environment": "reference",
+    "jurisdiction": "UK",
+    "base_currency": "GBP"
+  },
+  "inputs": {
+    "portfolio_state": {
+      "total_value": 100000,
+      "asset_allocation": {
+        "EQUITIES": 0.78,
+        "BONDS": 0.16,
+        "CASH": 0.06
+      },
+      "positions_summary": "Structured portfolio state provided (manual input).",
+      "cash_balance": null
+    },
+    "cash_flows": {
+      "pending_contributions": 0,
+      "pending_withdrawals": 0,
+      "notes": "No cash flows provided."
+    },
+    "constraints": {
+      "liquidity_needs": "Not captured yet.",
+      "tax_or_wrapper_constraints": "Not captured yet.",
+      "other_constraints": "Not captured yet."
+    },
+    "market_context": {
+      "as_of_date": "2026-02-08",
+      "notes": "No exceptional market context assumed."
+    }
+  },
+  "governance": {
+    "investment_policy": {
+      "policy_id": "ape-policy",
+      "policy_version": "0.1-default",
+      "policy_source": "default"
+    },
+    "explanation_contract": {
+      "version": "0.1-default"
+    }
+  },
+  "evaluation": {
+    "drift_analysis": {
+      "target_weights": {
+        "EQUITIES": 0.8,
+        "BONDS": 0.15,
+        "CASH": 0.05
+      },
+      "actual_weights": {
+        "EQUITIES": 0.78,
+        "BONDS": 0.16,
+        "CASH": 0.06
+      },
+      "absolute_drift": {
+        "EQUITIES": -0.02,
+        "BONDS": 0.01,
+        "CASH": 0.01
+      },
+      "bands_breached": false
+    },
+    "risk_checks": {
+      "drawdown_proximity": "Not evaluated.",
+      "risk_capacity_breached": false,
+      "notes": "Risk guardrails satisfied."
+    }
+  },
+  "recommendation": {
+    "type": "DO_NOTHING",
+    "summary": "No action required; portfolio is within policy rebalancing bands.",
+    "proposed_actions": [],
+    "turnover_estimate": {
+      "gross_turnover_pct": 0,
+      "trade_count": 0
+    }
+  },
+  "explanation": {
+    "decision_summary": "Portfolio is within policy bands and no action is required.",
+    "relevant_portfolio_state": "Weights are within target bands with no cash flows.",
+    "policy_basis": "Policy targets and bands were applied.",
+    "reasoning_and_tradeoffs": "Rebalancing is unnecessary without a band breach.",
+    "uncertainty_and_confidence": "High confidence given deterministic inputs.",
+    "next_review_or_trigger": "Review at next scheduled check or if inputs change."
+  },
+  "user_acknowledgement": {
+    "decision": "DEFER",
+    "user_notes": "Reference snapshot.",
+    "acknowledged_at": null
+  },
+  "outcome": {
+    "implemented": null,
+    "implementation_notes": null,
+    "review_date": null,
+    "observed_effects": null
+  },
+  "audit": {
+    "logic_version": "0.3",
+    "notes": "Reference snapshot for Milestone 3a."
+  }
+}

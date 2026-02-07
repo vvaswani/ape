@@ -14,12 +14,55 @@ export type RecommendationType =
   | "DEFER_AND_REVIEW"
   | "ASK_CLARIFYING_QUESTIONS";
 
+export type OutcomeState =
+  | "RECOMMEND_ACTION"
+  | "RECOMMEND_NO_ACTION"
+  | "CANNOT_DECIDE_MISSING_INPUTS"
+  | "CANNOT_DECIDE_POLICY_GAP"
+  | "ERROR_NONRECOVERABLE";
+
+export type InputObservationSource = "form" | "prompt" | "request" | "policy" | "system";
+
+export interface InputObserved {
+  input_key: string;
+  value: string | number | boolean | null;
+  source: InputObservationSource;
+}
+
+export interface InputMissing {
+  input_key: string;
+  impact: string;
+}
+
+export interface PolicyItemReference {
+  dpq_id: string;
+  ipm_section_heading?: string;
+  ipm_field_key?: string;
+  ipm_clause_id?: string;
+}
+
+export interface SnapshotNotice {
+  code: string;
+  message: string;
+  fields?: string[];
+}
+
 export interface DecisionSnapshot {
   snapshot_id: string;
   snapshot_version: string;
   created_at: string;
 
   project: "AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator)";
+
+  outcome_state: OutcomeState;
+
+  inputs_observed: InputObserved[];
+  inputs_missing: InputMissing[];
+
+  policy_items_referenced: PolicyItemReference[];
+
+  warnings: SnapshotNotice[];
+  errors: SnapshotNotice[];
 
   context: {
     user_id: string;
