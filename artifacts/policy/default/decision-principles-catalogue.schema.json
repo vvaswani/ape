@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/decision-principles-catalogue.schema.json",
+  "title": "Decision Principles Catalogue",
+  "description": "Policy-only catalogue of decision questions. This schema documents structure; it does not embed implementation logic.",
+  "type": "object",
+  "required": ["metadata", "principles"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "description": "Catalogue metadata. Do not embed implementation logic here.",
+      "required": ["schema_version", "catalogue_version", "changelog"],
+      "properties": {
+        "schema_version": { "type": "string", "description": "Schema version identifier." },
+        "catalogue_version": {
+          "type": "string",
+          "pattern": "^(\\d+\\.\\d+\\.\\d+|\\d{4}-\\d{2}-\\d{2})$",
+          "description": "Catalogue content version (semver X.Y.Z or date-based YYYY-MM-DD)."
+        },
+        "generated_at": { "type": "string", "format": "date-time", "description": "Optional generation timestamp." },
+        "changelog": {
+          "type": "array",
+          "description": "Human-readable catalogue changes. Do not embed logic.",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["version", "date", "notes"],
+            "properties": {
+              "version": { "type": "string" },
+              "date": { "type": "string", "format": "date" },
+              "notes": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "principles": {
+      "type": "array",
+      "description": "Decision questions and required inputs. Do not embed implementation logic.",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/principle" }
+    }
+  },
+  "$defs": {
+    "condition": {
+      "type": "object",
+      "description": "Condition descriptor (policy-only).",
+      "required": ["id", "description"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^(IC|MAC)-\\d{3}$" },
+        "description": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "ipmMapping": {
+      "type": "object",
+      "description": "Mapping to IPM sections. Do not embed implementation logic.",
+      "required": ["ipm_section_heading", "ipm_field_key"],
+      "properties": {
+        "ipm_section_heading": { "type": "string", "minLength": 1 },
+        "ipm_field_key": { "type": "string", "minLength": 1 },
+        "ipm_clause_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "principle": {
+      "type": "object",
+      "description": "Decision question definition. Policy-only; no implementation guidance.",
+      "required": [
+        "question_id",
+        "question_text",
+        "required_inputs",
+        "rationale",
+        "inaction_conditions",
+        "mandatory_action_conditions",
+        "ipm_mapping"
+      ],
+      "properties": {
+        "question_id": { "type": "string", "pattern": "^DPQ-\\d{3}$" },
+        "question_text": { "type": "string", "minLength": 1 },
+        "required_inputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "rationale": { "type": "string", "minLength": 1 },
+        "inaction_conditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/condition" }
+        },
+        "mandatory_action_conditions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/condition" }
+        },
+        "ipm_mapping": { "$ref": "#/$defs/ipmMapping" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

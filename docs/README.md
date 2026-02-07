@@ -26,4 +26,8 @@ Index only. This file must not be treated as authoritative.
 - Type definitions live in generated docs at `docs/reference/api/` (run `cd agent && npm run docs:api`).
 - `reference/tests/README.md` — Manual test scenarios by milestone. Update when scenarios or validation steps change.
 - `../artifacts/README.md` — Policy artifact usage and precedence. Update when policy structure changes.
+- `../artifacts/policy/default/decision-principles-catalogue.md` — Decision Principles Catalogue (policy reference).
+- `../artifacts/policy/default/decision-principles-catalogue.json` — Decision Principles Catalogue (machine-readable).
+- `../artifacts/policy/default/decision-principles-catalogue.schema.json` — JSON schema for the catalogue.
+- `../artifacts/policy/default/decision-principles-to-ipm-mapping.md` — Mapping of decision questions to IPM sections.
 - Planning materials live in `planning/archive/` and are non-authoritative.

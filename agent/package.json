@@ -37,6 +37,7 @@
     "jsdom": "^26.0.0",
     "msw": "^2.11.2",
     "tailwindcss": "^4",
+    "ajv": "^8.12.0",
     "typedoc": "^0.28.0",
     "typedoc-plugin-markdown": "^4.2.0",
     "typescript": "^5",
