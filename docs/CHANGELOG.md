@@ -121,5 +121,43 @@
 
 ---
 
+## 2026-02-07 — Iteration M3b (Show Your Work)
+### Added
+- Evaluation fields for policy application (`policy_applied`), deterministic drift (`drift`), and correctness (`correctness`).
+- Contradiction rejection with deterministic fail status and structured error codes.
+- Golden reference snapshots under `artifacts/reference/milestone-3b/` (reference outputs only).
+
+### Changed
+- If `portfolio_state` exists, the system never asks for weights.
+- Deterministic drift and policy application details are now explicit in snapshots.
+
+### Fixed
+- N/A
+
+### Removed
+- N/A
+
+### Data / Schema
+- Decision Snapshot evaluation section expanded to include policy-applied provenance, drift status, and correctness status.
+
+### Risks / Follow-ups
+- M3c guardrail expansions remain out of scope.
+
+### Manual regression checks (quick)
+- [ ] Portfolio state present → no request for weights; drift status is deterministic.
+- [ ] Contradiction between model output and deterministic expectation yields `correctness=fail`.
+- [ ] Drift evaluation is populated or explicitly marked not applicable/cannot compute.
+
+### Tests
+- `cd agent && npm test`
+
+### Paths touched
+- `agent/lib/domain/decisionSnapshot.ts`
+- `agent/lib/services/decisionService.ts`
+- `agent/lib/services/decisionSnapshotContract.m3b.test.ts`
+- `artifacts/reference/milestone-3b/*`
+
+---
+
 ## Milestone 3c Marker
 Backfilled documentation is complete through Milestone 3c.

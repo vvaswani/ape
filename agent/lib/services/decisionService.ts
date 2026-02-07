@@ -15,8 +15,6 @@
  */
 
 import crypto from "node:crypto";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 
 import type { ChatRequest } from "@/lib/domain/chat";
 import type {
@@ -44,42 +42,27 @@ import {
 const SNAPSHOT_VERSION = "0.3";
 const EPS = 1e-6;
 
-const POLICY_CATALOGUE_PATHS = [
-  path.resolve(process.cwd(), "artifacts", "policy", "default", "decision-principles-catalogue.json"),
-  path.resolve(process.cwd(), "..", "artifacts", "policy", "default", "decision-principles-catalogue.json"),
+const DPQ_AUTHORITY = "DPQ-001";
+const DPQ_DRIFT = "DPQ-002";
+const DPQ_CASHFLOW = "DPQ-003";
+const DPQ_RISK = "DPQ-004";
+
+const POLICY_ITEMS: PolicyItemReference[] = [
+  { dpq_id: DPQ_AUTHORITY },
+  { dpq_id: DPQ_DRIFT },
+  { dpq_id: DPQ_CASHFLOW },
+  { dpq_id: DPQ_RISK },
 ];
 
-function loadPolicyCatalogue(): PolicyItemReference[] {
-  for (const candidate of POLICY_CATALOGUE_PATHS) {
-    try {
-      const raw = readFileSync(candidate, "utf-8");
-      const parsed = JSON.parse(raw) as {
-        principles?: Array<{
-          question_id?: string;
-          ipm_mapping?: {
-            ipm_section_heading?: string;
-            ipm_field_key?: string;
-            ipm_clause_id?: string;
-          };
-        }>;
-      };
-      const principles = parsed.principles ?? [];
-      return principles
-        .filter((p) => typeof p.question_id === "string")
-        .map((p) => ({
-          dpq_id: p.question_id as string,
-          ipm_section_heading: p.ipm_mapping?.ipm_section_heading,
-          ipm_field_key: p.ipm_mapping?.ipm_field_key,
-          ipm_clause_id: p.ipm_mapping?.ipm_clause_id,
-        }));
-    } catch {
-      // Continue to next path.
-    }
-  }
-  return [];
-}
-
-const POLICY_ITEMS = loadPolicyCatalogue();
+const REASON_CODES = {
+  MISSING_INPUTS: "MISSING_INPUTS",
+  DRIFT_CANNOT_COMPUTE: "DRIFT_CANNOT_COMPUTE",
+  CONTRADICTION_DETECTED: "CONTRADICTION_DETECTED",
+  SKIPPED_NOT_APPLICABLE: "SKIPPED_NOT_APPLICABLE",
+  POLICY_APPLIED: "POLICY_APPLIED",
+  PARTIAL_APPLY: "PARTIAL_APPLY",
+  BLOCKED: "BLOCKED",
+} as const;
 
 function findPolicyItem(dpqId: string): PolicyItemReference | null {
   const match = POLICY_ITEMS.find((p) => p.dpq_id === dpqId);
@@ -217,17 +200,25 @@ function describeFormState(state: PortfolioStateInput | undefined): string {
   return `missing: ${missing.join(", ")}`;
 }
 
-function listMissingInputs(state: PortfolioStateInput | null): Array<{ input_key: string; impact: string }> {
+function listMissingInputs(
+  state: PortfolioStateInput | null,
+  hasPortfolioStateProvided: boolean
+): Array<{ input_key: string; impact: string }> {
   const missing: Array<{ input_key: string; impact: string }> = [];
   if (!state) {
     return [
-      { input_key: "portfolio_state.weights", impact: "Required to compute drift and recommendation." },
+      ...(hasPortfolioStateProvided
+        ? []
+        : [{ input_key: "portfolio_state.weights", impact: "Required to compute drift and recommendation." }]),
       { input_key: "portfolio_state.cash_flows", impact: "Required to assess cashflow-driven rebalancing." },
       { input_key: "portfolio_state.total_value", impact: "Required for sizing and validation." },
     ];
   }
 
-  if (state.weights.EQUITIES === null || state.weights.BONDS === null || state.weights.CASH === null) {
+  if (
+    !hasPortfolioStateProvided &&
+    (state.weights.EQUITIES === null || state.weights.BONDS === null || state.weights.CASH === null)
+  ) {
     missing.push({
       input_key: "portfolio_state.weights",
       impact: "Required to compute drift and recommendation.",
@@ -269,22 +260,149 @@ function policyItemsForContext(args: {
 }): PolicyItemReference[] {
   const refs: PolicyItemReference[] = [];
   if (args.hasAuthorityCheck) {
-    const item = findPolicyItem("DPQ-001");
+    const item = findPolicyItem(DPQ_AUTHORITY);
     if (item) refs.push(item);
   }
   if (args.hasDriftCheck) {
-    const item = findPolicyItem("DPQ-002");
+    const item = findPolicyItem(DPQ_DRIFT);
     if (item) refs.push(item);
   }
   if (args.hasCashflowCheck) {
-    const item = findPolicyItem("DPQ-003");
+    const item = findPolicyItem(DPQ_CASHFLOW);
     if (item) refs.push(item);
   }
   if (args.hasRiskCheck) {
-    const item = findPolicyItem("DPQ-004");
+    const item = findPolicyItem(DPQ_RISK);
     if (item) refs.push(item);
   }
   return refs;
+}
+
+function detectContradiction(args: {
+  expected: RecommendationType;
+  model: RecommendationType;
+  hasState: boolean;
+  driftResult: ReturnType<typeof computeDrift> | null;
+}): string | null {
+  if (!args.hasState || !args.driftResult) return null;
+  if (args.model !== args.expected) {
+    return `Model recommendation ${args.model} contradicts deterministic expectation ${args.expected}.`;
+  }
+  return null;
+}
+
+function buildDriftEvaluation(args: {
+  hasPortfolioStateProvided: boolean;
+  driftResult: ReturnType<typeof computeDrift> | null;
+  policy: PolicyJson;
+}) {
+  if (args.driftResult) {
+    return {
+      status: "computed" as const,
+      target_weights: {
+        EQUITIES: args.policy.strategic_asset_allocation.target_weights.EQUITIES,
+        BONDS: args.policy.strategic_asset_allocation.target_weights.BONDS,
+        CASH: args.policy.strategic_asset_allocation.target_weights.CASH,
+      },
+      actual_weights: {
+        EQUITIES: args.driftResult.actual_weights.EQUITIES,
+        BONDS: args.driftResult.actual_weights.BONDS,
+        CASH: args.driftResult.actual_weights.CASH,
+      },
+      absolute_drift: {
+        EQUITIES: args.driftResult.absolute_drift.EQUITIES,
+        BONDS: args.driftResult.absolute_drift.BONDS,
+        CASH: args.driftResult.absolute_drift.CASH,
+      },
+      bands_breached: args.driftResult.bands_breached,
+    };
+  }
+
+  if (args.hasPortfolioStateProvided) {
+    return {
+      status: "cannot_compute" as const,
+    };
+  }
+
+  return {
+    status: "not_applicable" as const,
+  };
+}
+
+function buildPolicyAppliedEvaluation(args: {
+  policy: PolicyJson;
+  hasPortfolioStateProvided: boolean;
+  evaluatedPolicies: string[];
+  skippedPolicies: Array<{ dpq_id: string; reason: string }>;
+  riskGuardrailsUsed: string[];
+  contradictionDetected: boolean;
+  reasonCodes: string[];
+  blockingInputs?: string[];
+}) {
+  const targets = args.policy.strategic_asset_allocation.target_weights;
+  const bands = args.policy.rebalancing_policy.absolute_bands;
+  const totalPolicies = [DPQ_AUTHORITY, DPQ_DRIFT, DPQ_CASHFLOW, DPQ_RISK];
+
+  const evaluated = args.evaluatedPolicies;
+  const skipped = args.skippedPolicies;
+  const evaluatedCount = evaluated.length;
+
+  let status: "applied" | "not_applied" | "partial" | "blocked" = "applied";
+  if (args.contradictionDetected) {
+    status = "blocked";
+  } else if (evaluatedCount === 0) {
+    status = "not_applied";
+  } else if (evaluatedCount < totalPolicies.length || skipped.length > 0) {
+    status = "partial";
+  }
+
+  return {
+    targets: args.hasPortfolioStateProvided ? targets : null,
+    bands: args.hasPortfolioStateProvided ? bands : null,
+    risk_guardrails_used: args.riskGuardrailsUsed,
+    evaluated_policies: evaluated,
+    skipped_policies: skipped,
+    status,
+    reason_codes: args.reasonCodes,
+    blocking_inputs: args.blockingInputs,
+  };
+}
+
+function buildCorrectnessEvaluation(args: {
+  checksRun: string[];
+  contradictionDetected: boolean;
+  hasPortfolioStateProvided: boolean;
+  driftResult: ReturnType<typeof computeDrift> | null;
+  riskEvalStatus: ReturnType<typeof evaluateRiskGuardrails>["status"];
+}) {
+  if (args.contradictionDetected) {
+    return {
+      status: "fail" as const,
+      checks_run: args.checksRun,
+      failed_checks: ["CONTRADICTION_DETECTED"],
+    };
+  }
+
+  if (args.hasPortfolioStateProvided && !args.driftResult) {
+    return {
+      status: "indeterminate" as const,
+      checks_run: args.checksRun,
+      failed_checks: ["DRIFT_CANNOT_COMPUTE"],
+    };
+  }
+
+  if (args.riskEvalStatus === "MISSING_INPUTS") {
+    return {
+      status: "indeterminate" as const,
+      checks_run: args.checksRun,
+      failed_checks: ["RISK_INPUTS_MISSING"],
+    };
+  }
+
+  return {
+    status: "pass" as const,
+    checks_run: args.checksRun,
+  };
 }
 
 /**
@@ -351,6 +469,23 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
         },
       },
       evaluation: {
+        policy_applied: {
+          targets: null,
+          bands: null,
+          risk_guardrails_used: [],
+          evaluated_policies: [],
+          skipped_policies: [],
+          status: "not_applied",
+          reason_codes: ["INVALID_REQUEST"],
+        },
+        correctness: {
+          status: "indeterminate",
+          checks_run: [],
+          failed_checks: ["INVALID_REQUEST"],
+        },
+        drift: {
+          status: "not_applicable",
+        },
         drift_analysis: {
           target_weights: { EQUITIES: 0, BONDS: 0, CASH: 0 },
           actual_weights: { EQUITIES: null, BONDS: null, CASH: null },
@@ -417,9 +552,11 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
    */
   const lastUserMessage = extractLastUserMessage(req.messages);
   const parsedState = lastUserMessage ? extractPortfolioStateFromPrompt(lastUserMessage) : null;
+  const hasPortfolioStateProvided =
+    !!req.portfolio_state && !isEmptyState(req.portfolio_state);
   const structuredState =
     req.portfolio_state &&
-    !isEmptyState(req.portfolio_state) &&
+    hasPortfolioStateProvided &&
     hasCompleteWeights(req.portfolio_state)
       ? req.portfolio_state
       : null;
@@ -465,13 +602,19 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
   const pendingWithdraw = state?.cash_flows.pending_withdrawals_gbp ?? null;
   const hasCashFlows = (pendingContrib ?? 0) > 0 || (pendingWithdraw ?? 0) > 0;
 
-  const baseRecommendationType: RecommendationType = !state || !driftResult
-    ? "ASK_CLARIFYING_QUESTIONS"
-    : hasCashFlows
-      ? "REBALANCE_VIA_CONTRIBUTIONS"
-      : driftResult.bands_breached
-        ? "REBALANCE"
-        : "DO_NOTHING";
+  const baseRecommendationType: RecommendationType = !state
+    ? hasConflict
+      ? "ASK_CLARIFYING_QUESTIONS"
+      : hasPortfolioStateProvided
+        ? "DEFER_AND_REVIEW"
+        : "ASK_CLARIFYING_QUESTIONS"
+    : !driftResult
+      ? "DEFER_AND_REVIEW"
+      : hasCashFlows
+        ? "REBALANCE_VIA_CONTRIBUTIONS"
+        : driftResult.bands_breached
+          ? "REBALANCE"
+          : "DO_NOTHING";
 
   const authorityViolation = evaluateAuthority(authority);
   const riskEval = evaluateRiskGuardrails({
@@ -490,7 +633,7 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
   const policyItems = policyItemsForContext({
     hasAuthorityCheck: true,
     hasDriftCheck: !!driftResult,
-    hasCashflowCheck: hasCashFlows,
+    hasCashflowCheck: !!state,
     hasRiskCheck: true,
   });
 
@@ -554,7 +697,13 @@ Computed drift (deterministic):
 - absolute_drift: equities=${driftResult?.absolute_drift.EQUITIES}, bonds=${driftResult?.absolute_drift.BONDS}, cash=${driftResult?.absolute_drift.CASH}
 - bands_breached: ${driftResult?.bands_breached}
 `
-      : `
+      : hasPortfolioStateProvided
+        ? `
+Portfolio state was provided but is incomplete for deterministic evaluation.
+- Do NOT ask for weights.
+- Defer safely and explain which inputs are missing.
+`
+        : `
 Portfolio state has NOT been provided.
 - Default to ASK_CLARIFYING_QUESTIONS or DEFER_AND_REVIEW.
 - Ask only for the minimum missing inputs required to proceed.
@@ -711,16 +860,37 @@ Portfolio state has NOT been provided.
    * Apply Milestone #3b guardrails (authoritative policy + drift boundaries)
    * ------------------------------------------------------------------
    */
-  const guard = applyGuardrails(
-    {
-      policy,
-      portfolio_state: state,
-      drift: driftResult,
-      risk_inputs: riskInputs,
-      authority,
-    },
-    modelDecision
-  );
+  const contradictionMessage = detectContradiction({
+    expected: expectedRecommendationType,
+    model: modelDecision.recommendation_type,
+    hasState: !!state,
+    driftResult,
+  });
+  const contradictionDetected = !!contradictionMessage;
+
+  const guard = contradictionDetected
+    ? {
+        model: {
+          ...downgradeToDefer(
+            modelDecision,
+            policy,
+            "Contradiction detected between model output and deterministic evaluation."
+          ),
+          proposed_actions: [],
+        },
+        warnings: contradictionMessage ? [contradictionMessage] : [],
+        overridden: true,
+      }
+    : applyGuardrails(
+        {
+          policy,
+          portfolio_state: state,
+          drift: driftResult,
+          risk_inputs: riskInputs,
+          authority,
+        },
+        modelDecision
+      );
 
   if (guard.overridden || guard.warnings.length) {
     console.warn("[APE] Guardrails applied:", guard.warnings);
@@ -758,11 +928,14 @@ Portfolio state has NOT been provided.
    * Build Decision Snapshot
    * ------------------------------------------------------------------
    */
-  const missingInputs = listMissingInputs(state);
-  const outcomeState: OutcomeState =
+  const missingInputs = listMissingInputs(state, hasPortfolioStateProvided);
+  let outcomeState: OutcomeState =
     missingInputs.length > 0 && (!state || expectedRecommendationType === "ASK_CLARIFYING_QUESTIONS")
       ? "CANNOT_DECIDE_MISSING_INPUTS"
       : outcomeFromRecommendation(finalModel.recommendation_type);
+  if (contradictionDetected) {
+    outcomeState = "ERROR_NONRECOVERABLE";
+  }
   const warnings: SnapshotNotice[] = [];
   const errors: SnapshotNotice[] = [];
 
@@ -786,6 +959,23 @@ Portfolio state has NOT been provided.
       code: "AUTHORITY_VIOLATION",
       message: authorityViolation,
       fields: ["authority.actor_role", "authority.decision_intent"],
+    });
+  }
+
+  if (contradictionDetected) {
+    errors.push({
+      code: "CONTRADICTION_DETECTED",
+      message:
+        contradictionMessage ??
+        "Contradiction detected between model output and deterministic evaluation.",
+      fields: ["recommendation.type"],
+    });
+  }
+
+  if (hasPortfolioStateProvided && !driftResult) {
+    warnings.push({
+      code: "DRIFT_CANNOT_COMPUTE",
+      message: "Portfolio state provided but drift could not be computed.",
     });
   }
 
@@ -824,6 +1014,61 @@ Portfolio state has NOT been provided.
         ]
       : []),
   ];
+
+  const evaluatedPolicies: string[] = [];
+  const skippedPolicies: Array<{ dpq_id: string; reason: string }> = [];
+
+  evaluatedPolicies.push(DPQ_AUTHORITY);
+  evaluatedPolicies.push(DPQ_RISK);
+
+  if (driftResult) {
+    evaluatedPolicies.push(DPQ_DRIFT);
+  } else if (hasPortfolioStateProvided) {
+    skippedPolicies.push({ dpq_id: DPQ_DRIFT, reason: REASON_CODES.DRIFT_CANNOT_COMPUTE });
+  } else {
+    skippedPolicies.push({ dpq_id: DPQ_DRIFT, reason: REASON_CODES.MISSING_INPUTS });
+  }
+
+  if (state) {
+    evaluatedPolicies.push(DPQ_CASHFLOW);
+  } else {
+    skippedPolicies.push({ dpq_id: DPQ_CASHFLOW, reason: REASON_CODES.MISSING_INPUTS });
+  }
+
+  const reasonCodes: string[] = [];
+  if (missingInputs.length > 0) reasonCodes.push(REASON_CODES.MISSING_INPUTS);
+  if (hasPortfolioStateProvided && !driftResult) reasonCodes.push(REASON_CODES.DRIFT_CANNOT_COMPUTE);
+  if (contradictionDetected) reasonCodes.push(REASON_CODES.CONTRADICTION_DETECTED);
+
+  const policyApplied = buildPolicyAppliedEvaluation({
+    policy,
+    hasPortfolioStateProvided,
+    evaluatedPolicies,
+    skippedPolicies,
+    riskGuardrailsUsed: [DPQ_RISK],
+    contradictionDetected,
+    reasonCodes: reasonCodes.length ? reasonCodes : [REASON_CODES.POLICY_APPLIED],
+    blockingInputs: missingInputs.length ? missingInputs.map((m) => m.input_key) : undefined,
+  });
+
+  const correctness = buildCorrectnessEvaluation({
+    checksRun: [
+      "AUTHORITY_CHECK",
+      "RISK_GUARDRAILS",
+      "DRIFT_EVALUATION",
+      "CONTRADICTION_CHECK",
+    ],
+    contradictionDetected,
+    hasPortfolioStateProvided,
+    driftResult,
+    riskEvalStatus: riskEval.status,
+  });
+
+  const driftEvaluation = buildDriftEvaluation({
+    hasPortfolioStateProvided,
+    driftResult,
+    policy,
+  });
 
   const snapshot: DecisionSnapshot = {
     snapshot_id: snapshotId,
@@ -885,6 +1130,9 @@ Portfolio state has NOT been provided.
     },
 
     evaluation: {
+      policy_applied: policyApplied,
+      correctness,
+      drift: driftEvaluation,
       drift_analysis: {
         target_weights: {
           EQUITIES: policy.strategic_asset_allocation.target_weights.EQUITIES,
@@ -1041,6 +1289,13 @@ function enforceExplanationContract(args: {
     const mismatchReason = model.explanation.decision_summary.includes("Guardrails override")
       ? model.explanation.decision_summary
       : "Recommendation type mismatch.";
+    if (expectedType === "ASK_CLARIFYING_QUESTIONS") {
+      return {
+        model: forceAsk(model, mismatchReason),
+        warnings,
+        overridden: true,
+      };
+    }
     return {
       model: downgradeToDefer(model, policy, mismatchReason),
       warnings,
@@ -1139,6 +1394,23 @@ function downgradeToDefer(model: ModelDecision, policy: PolicyJson, reason: stri
       reasoning_and_tradeoffs: "Cannot safely justify action; returning defer.",
       uncertainty_and_confidence: "Low confidence due to contract violation.",
       next_review_or_trigger: "Fix explanation contract and retry.",
+    },
+  };
+}
+
+function forceAsk(model: ModelDecision, reason: string): ModelDecision {
+  return {
+    ...model,
+    recommendation_type: "ASK_CLARIFYING_QUESTIONS",
+    recommendation_summary: "Additional inputs required before a recommendation can be made.",
+    proposed_actions: [],
+    explanation: {
+      decision_summary: reason,
+      relevant_portfolio_state: model.explanation.relevant_portfolio_state || "Inputs were missing.",
+      policy_basis: model.explanation.policy_basis,
+      reasoning_and_tradeoffs: "Cannot proceed without required inputs.",
+      uncertainty_and_confidence: "High uncertainty due to missing inputs.",
+      next_review_or_trigger: "Provide the missing inputs and retry.",
     },
   };
 }

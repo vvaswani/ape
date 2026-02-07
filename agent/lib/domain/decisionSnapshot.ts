@@ -47,6 +47,37 @@ export interface SnapshotNotice {
   fields?: string[];
 }
 
+export type PolicyAppliedStatus = "applied" | "not_applied" | "partial" | "blocked";
+
+export interface PolicyAppliedEvaluation {
+  targets: { EQUITIES: number; BONDS: number; CASH: number } | null;
+  bands: { EQUITIES: number; BONDS: number; CASH: number } | null;
+  risk_guardrails_used: string[];
+  evaluated_policies: string[];
+  skipped_policies: Array<{ dpq_id: string; reason: string }>;
+  status: PolicyAppliedStatus;
+  reason_codes: string[];
+  blocking_inputs?: string[];
+}
+
+export type CorrectnessStatus = "pass" | "fail" | "indeterminate";
+
+export interface CorrectnessEvaluation {
+  status: CorrectnessStatus;
+  checks_run: string[];
+  failed_checks?: string[];
+}
+
+export type DriftStatus = "computed" | "not_applicable" | "cannot_compute";
+
+export interface DriftEvaluation {
+  status: DriftStatus;
+  target_weights?: { EQUITIES: number; BONDS: number; CASH: number };
+  actual_weights?: { EQUITIES: number | null; BONDS: number | null; CASH: number | null };
+  absolute_drift?: { EQUITIES: number | null; BONDS: number | null; CASH: number | null };
+  bands_breached?: boolean | null;
+}
+
 export interface DecisionSnapshot {
   snapshot_id: string;
   snapshot_version: string;
@@ -110,6 +141,9 @@ export interface DecisionSnapshot {
   };
 
   evaluation: {
+    policy_applied: PolicyAppliedEvaluation;
+    correctness: CorrectnessEvaluation;
+    drift: DriftEvaluation;
     drift_analysis: {
       target_weights: { EQUITIES: number; BONDS: number; CASH: number };
       actual_weights: { EQUITIES: number | null; BONDS: number | null; CASH: number | null };
