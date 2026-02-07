@@ -92,5 +92,34 @@
 
 ---
 
+## 2026-02-07 — Iteration M3a (Snapshot Contract Retrofit & Observability Fields)
+### Added
+- Decision Snapshot contract fields: `outcome_state`, `inputs_observed`, `inputs_missing`, `policy_items_referenced`, `warnings[]`, `errors[]` (structured).
+- Golden snapshot artifact for in-band / no-cashflows scenario under `artifacts/reference/milestone-3a/`.
+- Contract validation tests including negative validation coverage.
+
+### Changed
+- Decision service now returns snapshot-shaped error responses for invalid requests.
+- Missing or incomplete inputs produce explicit missing-input outcomes rather than silent failure.
+
+### Fixed
+- N/A
+
+### Removed
+- N/A
+
+### Data / Schema
+- Decision Snapshot contract expanded to include explicit outcome state, input provenance, policy references, and structured warnings/errors.
+
+### Risks / Follow-ups
+- Policy application details (`policy_applied`) and expanded guardrails remain out of scope for M3a.
+
+### Manual regression checks (quick)
+- [ ] Invalid request returns snapshot with populated `outcome_state` and structured `errors[]`.
+- [ ] Missing inputs populate `inputs_missing[]` and yield a safe missing-input outcome.
+- [ ] Normal in-band path includes at least one `policy_items_referenced` DPQ id.
+
+---
+
 ## Milestone 3c Marker
 Backfilled documentation is complete through Milestone 3c.

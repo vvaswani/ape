@@ -27,3 +27,10 @@ This folder contains manual test scenarios used to validate milestone behavior. 
 ## Which Milestone Is Current
 
 If multiple milestone sets exist, prefer the newest milestone folder (highest number/letter) unless a specific test plan says otherwise.
+
+## Available Milestone Folders
+
+- `docs/reference/tests/milestone-1/`
+- `docs/reference/tests/milestone-3a/`
+- `docs/reference/tests/milestone-3b/`
+- `docs/reference/tests/milestone-3c/`
