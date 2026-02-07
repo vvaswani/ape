@@ -1,0 +1,14 @@
+{
+  "entryPoints": [
+    "lib/domain/chat.ts",
+    "lib/domain/decisionSnapshot.ts",
+    "lib/domain/portfolioState.ts",
+    "lib/domain/riskInputs.ts",
+    "lib/domain/authority.ts"
+  ],
+  "out": "../docs/reference/api",
+  "plugin": ["typedoc-plugin-markdown"],
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "tsconfig": "tsconfig.typedoc.json"
+}

@@ -66,6 +66,11 @@ pnpm-debug.log*
 **/next-env.d.ts
 
 ############################################
+# generated docs (local)
+############################################
+docs/reference/api/
+
+############################################
 # artifacts (protect local outputs)
 ############################################
 # Local-only subfolders inside artifacts

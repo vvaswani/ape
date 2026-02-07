@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "docs:api": "typedoc --options typedoc.json",
     "prepare": "cd .. && husky install"
   },
   "dependencies": {
@@ -36,6 +37,8 @@
     "jsdom": "^26.0.0",
     "msw": "^2.11.2",
     "tailwindcss": "^4",
+    "typedoc": "^0.28.0",
+    "typedoc-plugin-markdown": "^4.2.0",
     "typescript": "^5",
     "vitest": "^2.1.8"
   },

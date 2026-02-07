@@ -22,6 +22,8 @@ Index only. This file must not be treated as authoritative.
 
 ## Supporting
 - `API.md` — Decision API contract. Update when request/response schema changes.
+- API semantics live in `docs/API.md`.
+- Type definitions live in generated docs at `docs/reference/api/` (run `cd agent && npm run docs:api`).
 - `reference/tests/README.md` — Manual test scenarios by milestone. Update when scenarios or validation steps change.
 - `../artifacts/README.md` — Policy artifact usage and precedence. Update when policy structure changes.
 - Planning materials live in `planning/archive/` and are non-authoritative.
