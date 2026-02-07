@@ -80,7 +80,7 @@
 - N/A
 
 ### Data / Schema
-- Milestone boundary inferred from cohesive commit/test set and docs under `docs/tests/milestone-3c` because no explicit release tag is present.
+- Milestone boundary inferred from cohesive commit/test set and docs under `docs/reference/tests/milestone-3c` because no explicit release tag is present.
 
 ### Risks / Follow-ups
 - Full structured audit reason-codes remain a follow-up before later milestones.

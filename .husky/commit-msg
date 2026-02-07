@@ -1,0 +1,48 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+commit_msg_file="$1"
+subject="$(head -n 1 "$commit_msg_file")"
+
+# Allow merge/revert commits without prefix enforcement.
+case "$subject" in
+  Merge\ *|Revert\ *)
+    exit 0
+    ;;
+esac
+
+changed_files="$(git diff --cached --name-only --diff-filter=ACMR)"
+if [ -z "$changed_files" ]; then
+  exit 0
+fi
+
+code_change=0
+for file in $changed_files; do
+  case "$file" in
+    docs/*) ;;
+    *.md) ;;
+    src/*|app/*|pages/*|lib/*|server/*|api/*|packages/*|prisma/*|migrations/*)
+      code_change=1
+      ;;
+    *.ts|*.tsx|*.js|*.jsx)
+      code_change=1
+      ;;
+    *)
+      ;;
+  esac
+done
+
+if [ "$code_change" -eq 1 ]; then
+  echo "$subject" | grep -Eq '^\[M[0-9]+[a-z]?\] ' || {
+    cat <<'EOF'
+Commit blocked: milestone prefix required for code changes.
+
+Required format:
+  [M3c] Short description
+  [M4a] Add drift guardrail tests
+
+Docs-only changes (docs/ or *.md only) do not require a prefix.
+EOF
+    exit 1
+  }
+fi

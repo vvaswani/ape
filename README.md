@@ -67,6 +67,10 @@ Then browse to:
 
 * This repository follows the Conventional Commits Specification for commits and pull requests.
 * Run unit tests from the `agent/` directory: `npm run test`
+* Milestone prefix required for code changes: `^[M<id>]` (e.g., `[M3c]`, `[M4a]`).
+* Example: `[M3c] Enforce explanation contract`
+* Docs-only changes (docs/ or *.md only) do not require a milestone prefix.
+* See `.husky/commit-msg` for the exact enforcement rule.
 
 ### Tests (Local)
 
