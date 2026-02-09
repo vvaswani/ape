@@ -177,6 +177,113 @@ describe("runDecision", () => {
     });
   });
 
+  it("scenario 2 (in-band, no cash flows) returns RECOMMEND_NO_ACTION", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy. Portfolio state: As of date 2026-02-07. Total value: £100,000. Weights: EQUITIES 80%, BONDS 15%, CASH 5%. No new contributions. No new withdrawals. Generate a decision snapshot and recommendation.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.8, BONDS: 0.15, CASH: 0.05 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      risk_inputs: defaultRiskInputs,
+    });
+
+    expect(result.snapshot.outcome_state).toBe("RECOMMEND_NO_ACTION");
+    expect(result.snapshot.recommendation.type).toBe("DO_NOTHING");
+    expect(result.snapshot.inputs_missing).toEqual([]);
+    expect(result.snapshot.policy_items_referenced.length).toBeGreaterThan(0);
+  });
+
+  it("policy provenance includes DPQ ids on an in-band, no-cash-flows decision", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy and include policy provenance. Portfolio state: As of date 2026-02-07. Total value: £200,000. Weights: EQUITIES 80%, BONDS 15%, CASH 5%. No new contributions. No new withdrawals. Return a decision snapshot with referenced policy items.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 200000,
+        weights: { EQUITIES: 0.8, BONDS: 0.15, CASH: 0.05 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      risk_inputs: defaultRiskInputs,
+    });
+
+    expect(result.snapshot.outcome_state).toBe("RECOMMEND_NO_ACTION");
+    expect(result.snapshot.policy_items_referenced.length).toBeGreaterThan(0);
+    expect(result.snapshot.policy_items_referenced[0].dpq_id).toMatch(/^DPQ-\d{3}$/);
+    expect(Array.isArray(result.snapshot.warnings)).toBe(true);
+    expect(Array.isArray(result.snapshot.errors)).toBe(true);
+  });
+
+  it("in-band, no-cash-flows returns DO_NOTHING with computed drift", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy. Portfolio state: Total value: £100,000. Asset allocation: Equities 80%, Bonds 15%, Cash 5%. No new contributions. No new withdrawals. Generate a decision snapshot and recommendation.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.8, BONDS: 0.15, CASH: 0.05 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      risk_inputs: defaultRiskInputs,
+    });
+
+    expect(result.snapshot.outcome_state).toBe("RECOMMEND_NO_ACTION");
+    expect(result.snapshot.recommendation.type).toBe("DO_NOTHING");
+    expect(result.snapshot.evaluation.drift.bands_breached).toBe(false);
+  });
+
+  it("out-of-band overweight returns REBALANCE with bands breached", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy. Portfolio state: Total value £100,000. Asset allocation: Equities 88%, Bonds 8%, Cash 4%. No new contributions. No new withdrawals. Generate a decision snapshot and recommendation.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.88, BONDS: 0.08, CASH: 0.04 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      risk_inputs: defaultRiskInputs,
+    });
+
+    expect(result.snapshot.outcome_state).toBe("RECOMMEND_ACTION");
+    expect(result.snapshot.recommendation.type).toBe("REBALANCE");
+    expect(result.snapshot.evaluation.drift.bands_breached).toBe(true);
+  });
+
   it("recommends rebalance when drift is out of band and no cash flows (scenario 3)", async () => {
     const result = await runDecision({
       messages: [
@@ -198,13 +305,25 @@ describe("runDecision", () => {
         {
           role: "user",
           content:
-            "Evaluate my portfolio against the current investment policy.\n\nPortfolio state:\n- Total value: £100,000\n- Asset allocation:\n  - Equities: 86%\n  - Bonds: 9%\n  - Cash: 5%\n\nCash flows:\n- Planned contribution: £5,000\n- No withdrawals\n\nGenerate a decision snapshot and recommendation.",
+            "Evaluate my portfolio against the current investment policy using the provided portfolio_state. Generate a decision snapshot and recommendation.",
         },
       ],
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.88, BONDS: 0.08, CASH: 0.04 },
+        cash_flows: {
+          pending_contributions_gbp: 5000,
+          pending_withdrawals_gbp: 0,
+        },
+      },
       risk_inputs: defaultRiskInputs,
     });
 
+    expect(result.snapshot.outcome_state).toBe("RECOMMEND_ACTION");
     expect(result.snapshot.recommendation.type).toBe("REBALANCE_VIA_CONTRIBUTIONS");
+    expect(result.snapshot.evaluation.drift.status).toBe("computed");
+    expect(result.snapshot.evaluation.drift_analysis.bands_breached).toBe(true);
   });
 
   it("overrides temptation to act when drift is in band with no cash flows (scenario 5)", async () => {
@@ -213,13 +332,25 @@ describe("runDecision", () => {
         {
           role: "user",
           content:
-            "Evaluate my portfolio against the current investment policy.\n\nPortfolio state:\n- Total value: £100,000\n- Asset allocation:\n  - Equities: 81%\n  - Bonds: 14%\n  - Cash: 5%\n\nThere are no new contributions or withdrawals.\n\nIf action is not justified by policy, explicitly recommend inaction.\nGenerate a decision snapshot.",
+            "Evaluate my portfolio against the current investment policy using the provided portfolio_state. If action is not justified by policy, explicitly recommend inaction. Generate a decision snapshot.",
         },
       ],
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
       risk_inputs: defaultRiskInputs,
     });
 
+    expect(result.snapshot.outcome_state).toBe("RECOMMEND_NO_ACTION");
     expect(result.snapshot.recommendation.type).toBe("DO_NOTHING");
+    expect(result.snapshot.evaluation.drift.status).toBe("computed");
+    expect(result.snapshot.evaluation.drift_analysis.bands_breached).toBe(false);
   });
 
   it("recommends rebalancing via contributions when in-band with contributions (3c prompt C)", async () => {
