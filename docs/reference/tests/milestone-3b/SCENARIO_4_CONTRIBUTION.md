@@ -27,7 +27,7 @@ Portfolio state:
 
 Cash flows:
 - Planned contribution: £5,000
-- No withdrawals
+- No new withdrawals
 
 Generate a decision snapshot and recommendation.
 ```

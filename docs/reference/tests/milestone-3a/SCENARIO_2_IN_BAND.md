@@ -21,8 +21,9 @@ Evaluate my portfolio against the current investment policy.
 Portfolio state:
 - As of date: 2026-02-07
 - Total value: £100,000
-- Weights: EQUITIES 78%, BONDS 16%, CASH 6%
-- No pending contributions or withdrawals
+- Weights: EQUITIES 62%, BONDS 33%, CASH 5%
+- No new contributions
+- No new withdrawals
 
 Generate a decision snapshot and recommendation.
 ```
@@ -32,12 +33,12 @@ Generate a decision snapshot and recommendation.
 ```powershell
 $body = @{ 
   messages = @(
-    @{ role = "user"; content = "Evaluate my portfolio against the current investment policy. Portfolio state: As of date 2026-02-07. Total value: £100,000. Weights: EQUITIES 78%, BONDS 16%, CASH 6%. No pending contributions or withdrawals. Generate a decision snapshot and recommendation." }
+    @{ role = "user"; content = "Evaluate my portfolio against the current investment policy. Portfolio state: As of date 2026-02-07. Total value: £100,000. Weights: EQUITIES 62%, BONDS 33%, CASH 5%. No new contributions. No new withdrawals. Generate a decision snapshot and recommendation." }
   )
   portfolio_state = @{ 
     as_of_date = "2026-02-07"
     total_value_gbp = 100000
-    weights = @{ EQUITIES = 0.78; BONDS = 0.16; CASH = 0.06 }
+    weights = @{ EQUITIES = 0.62; BONDS = 0.33; CASH = 0.05 }
     cash_flows = @{ pending_contributions_gbp = 0; pending_withdrawals_gbp = 0 }
   }
 } | ConvertTo-Json -Depth 10

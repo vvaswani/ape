@@ -25,7 +25,8 @@ Portfolio state:
   - Bonds: 8%
   - Cash: 4%
 
-There are no new contributions or withdrawals.
+No new contributions.
+No new withdrawals.
 
 Generate a decision snapshot and recommendation.
 ```

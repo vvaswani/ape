@@ -21,11 +21,12 @@ Evaluate my portfolio against the current investment policy.
 Portfolio state:
 - Total value: £100,000
 - Asset allocation:
-  - Equities: 78%
-  - Bonds: 16%
-  - Cash: 6%
+  - Equities: 62%
+  - Bonds: 33%
+  - Cash: 5%
 
-There are no new contributions or withdrawals planned.
+No new contributions.
+No new withdrawals.
 
 Generate a decision snapshot and recommendation.
 ```

@@ -25,6 +25,8 @@ export async function POST(req: Request) {
     const result = await runDecision({
       messages: body.messages,
       portfolio_state: body.portfolio_state,
+      risk_inputs: body.risk_inputs,
+      authority: body.authority,
     });
 
     return NextResponse.json(result);
