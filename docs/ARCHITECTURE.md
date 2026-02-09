@@ -23,6 +23,7 @@
 - **API / Service layer:** `POST /api/chat` validates request shape, orchestrates decision flow, applies guardrails, and emits snapshot.
 - **Data store(s):** File-based policy/config artifacts (`artifacts/policy/default/*`, optional `artifacts/local/*`) are source of truth; no DB through Milestone 3c.
 At runtime, policy must be provided via explicit configuration; repo artifacts are not valid runtime dependencies.
+Policy follows a two-layer model: an immutable, release-scoped governance bundle (policy JSON + Prime Directive markdown) is baked into the build/image and loaded in production via `POLICY_DIR` (for example, `/app/policy`), while a versioned, data-scoped user policy instance is derived from questionnaire outputs and used to set SAA (rare updates) with regular TAA overlays constrained by governance guardrails.
 - **Integrations:** LLM generation via Mastra agent abstraction; policy and explanation contract loaded from artifacts.
 - **Jobs / schedulers (if any):** None in current scope.
 

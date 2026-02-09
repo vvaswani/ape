@@ -134,6 +134,7 @@
 - Deterministic drift and policy application details are now explicit in snapshots.
 - Runtime policy loading now requires explicit configuration via `POLICY_PATH` or `POLICY_DIR`; runtime no longer reads policy directly from repo `artifacts/...`.
 - If no policy source is configured, the service fails fast with a clear runtime error.
+- Standardised production runtime policy delivery on a baked governance bundle via `POLICY_DIR` (for example, `/app/policy`); repo `artifacts/...` are not valid runtime dependencies in production.
 
 ### Fixed
 - N/A
@@ -146,6 +147,7 @@
 
 ### Risks / Follow-ups
 - M3c guardrail expansions remain out of scope.
+- Decision Snapshot schema currently captures `policy_id`/`policy_version`/`policy_source` but not policy/prime hashes or path provenance; audit defensibility relies on release metadata (image digest + policy bundle hashes) plus referenced user policy instance version/digest.
 
 ### Manual regression checks (quick)
 - [ ] Portfolio state present → no request for weights; drift status is deterministic.
@@ -153,6 +155,7 @@
 - [ ] Drift evaluation is populated or explicitly marked not applicable/cannot compute.
 - [ ] With no `POLICY_PATH`/`POLICY_DIR`, startup/request fails fast (no silent artifacts fallback).
 - [ ] With `POLICY_PATH` or `POLICY_DIR` set, policy loads successfully and snapshot includes normal policy provenance.
+- [ ] In production, `POLICY_DIR` points to the baked bundle path and prime directive hash pinning is enforced.
 - [ ] With `ALLOW_ARTIFACTS_READ=true` (dev only), artifact-based policy load is permitted; without it, artifact reads are rejected.
 
 ### Tests
