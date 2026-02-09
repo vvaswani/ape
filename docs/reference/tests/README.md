@@ -31,6 +31,4 @@ If multiple milestone sets exist, prefer the newest milestone folder (highest nu
 ## Available Milestone Folders
 
 - `docs/reference/tests/milestone-1/`
-- `docs/reference/tests/milestone-3a/`
-- `docs/reference/tests/milestone-3b/`
 - `docs/reference/tests/milestone-3c/`
