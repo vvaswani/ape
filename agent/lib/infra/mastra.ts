@@ -26,6 +26,14 @@ const AGENT_ID = "ape-agent";
  * In Next.js, module scope is reused within the same server process.
  * This is good enough for Milestone #1.
  */
+const resolvedModel =
+  process.env.OLLAMA_BASE_URL
+    ? {
+        id: process.env.LLM_MODEL_ID ?? "custom/qwen2.5:7b-instruct",
+        url: process.env.OLLAMA_BASE_URL,
+      }
+    : "google/gemini-2.5-flash";
+
 const mastra = new Mastra({
   agents: {
     apeAgent: new Agent({
@@ -43,8 +51,8 @@ Rules:
 Output:
 - Plain text for Milestone #1.
       `.trim(),
-      // model: "google/gemini-2.5-flash",
-      model: "google/gemini-2.5-flash-lite",
+      model: resolvedModel,
+      // model: "google/gemini-2.5-flash-lite",
 
     }),
   },
