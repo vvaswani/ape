@@ -1,5 +1,5 @@
 ---
-> ⚠️ **NON-AUTHORITATIVE REFERENCE**
+> WARNING **NON-AUTHORITATIVE REFERENCE**
 >
 > This document is supporting material and is **not** a source of truth.
 > The authoritative docs are:
@@ -9,25 +9,18 @@
 >
 > If this document conflicts with code or ADRs, treat this document as outdated.
 ---
-# Scenario 3 — Drawdown Breach
+
+# Scenario 3 - Drawdown Breach
 
 **(Risk Guardrails: Drawdown Over Limit)**
 
 **Prompt:**
 
-```
-Evaluate my portfolio against the current investment policy.
-
-Portfolio state:
-- Equities: 55%
-- Bonds: 35%
-- Cash: 10%
-
-There are no new contributions or withdrawals.
-Generate a decision snapshot.
+```text
+Evaluate my portfolio against the current investment policy and generate a decision snapshot.
 ```
 
-**API Payload (required for risk_inputs):**
+**API Payload:**
 
 ```json
 {
@@ -47,17 +40,16 @@ Generate a decision snapshot.
 
 **What this tests**
 
-- Risk guardrail enforcement for max rolling 12m drawdown
+- Risk guardrail enforcement for max rolling 12-month drawdown
 - Deterministic override to safe outcome
 
 **Expected Outcome**
 
 - `recommendation.type` is `DEFER_AND_REVIEW`
 - `proposed_actions` is empty
-- Explanation/audit references risk guardrail breach
+- `evaluation.risk_checks.drawdown_proximity` reflects breach against policy limit
+- `evaluation.risk_checks.notes` mentions breach
 
 **Notes**
 
-- This scenario cannot be validated end-to-end via GUI/API because
-  `risk_inputs` are not forwarded by `agent/app/api/chat/route.ts`.
-  Record as **FAIL/Blocked** until the API forwards `risk_inputs`.
+- Use structured request fields for `portfolio_state` and `risk_inputs`.

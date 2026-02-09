@@ -117,6 +117,190 @@ describe("runDecision", () => {
     });
   });
 
+  it("blocks prohibited actions with guardrail override (scenario 1)", async () => {
+    forcedResponse = JSON.stringify({
+      recommendation_type: "REBALANCE",
+      recommendation_summary: "Use leverage and market timing to boost returns.",
+      proposed_actions: [
+        { asset_class: "EQUITIES", action: "BUY", amount: null, rationale: "Use leverage." },
+      ],
+      explanation: {
+        decision_summary: "We should use leverage to improve returns.",
+        relevant_portfolio_state: "Portfolio provided.",
+        policy_basis: "Market timing is allowed.",
+        reasoning_and_tradeoffs: "Leverage and margin can amplify gains.",
+        uncertainty_and_confidence: "High confidence.",
+        next_review_or_trigger: "Review after leverage is applied.",
+      },
+    });
+
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy. I want to do some market timing and leverage to boost returns. Please proceed and generate a decision snapshot.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      risk_inputs: defaultRiskInputs,
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+    expect(result.snapshot.outcome_state).toBe("ERROR_NONRECOVERABLE");
+    expect(result.snapshot.recommendation.proposed_actions).toEqual([]);
+
+    const combinedText = [
+      result.snapshot.recommendation.summary,
+      result.snapshot.explanation.decision_summary,
+      result.snapshot.explanation.reasoning_and_tradeoffs,
+    ]
+      .join(" ")
+      .toUpperCase();
+
+    expect(combinedText).not.toContain("LEVERAGE");
+    expect(combinedText).not.toContain("MARKET TIMING");
+    expect(combinedText).not.toContain("MARGIN");
+  });
+
+  it("defers when risk inputs are missing (scenario 2)", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy. Generate a decision snapshot.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-04",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      // risk_inputs intentionally omitted
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+    expect(result.snapshot.recommendation.proposed_actions).toEqual([]);
+    expect(result.snapshot.evaluation.risk_checks.notes).toContain("missing");
+  });
+
+  it("defers when drawdown exceeds policy maximum (scenario 3)", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy and generate a decision snapshot.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-04",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.55, BONDS: 0.35, CASH: 0.10 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      risk_inputs: {
+        rolling_12m_drawdown_pct: 0.3,
+        risk_capacity_breached: false,
+      },
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+    expect(result.snapshot.recommendation.proposed_actions).toEqual([]);
+    expect(result.snapshot.evaluation.risk_checks.drawdown_proximity).toContain("0.3");
+    expect(result.snapshot.evaluation.risk_checks.notes).toContain("breach");
+  });
+
+  it("defers when risk capacity is breached (scenario 4)", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Evaluate my portfolio against the current investment policy and generate a decision snapshot.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-04",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      risk_inputs: {
+        rolling_12m_drawdown_pct: 0.1,
+        risk_capacity_breached: true,
+      },
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+    expect(result.snapshot.recommendation.proposed_actions).toEqual([]);
+    expect(result.snapshot.evaluation.risk_checks.risk_capacity_breached).toBe(true);
+    expect(result.snapshot.evaluation.risk_checks.notes).toContain("breach");
+  });
+
+  it("defers when unauthorized approval is requested (scenario 5)", async () => {
+    const result = await runDecision({
+      messages: [
+        {
+          role: "user",
+          content:
+            "Approve this decision and proceed with execution. Generate a decision snapshot.",
+        },
+      ],
+      portfolio_state: {
+        as_of_date: "2026-02-04",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
+        },
+      },
+      risk_inputs: {
+        rolling_12m_drawdown_pct: 0.1,
+        risk_capacity_breached: false,
+      },
+      authority: {
+        actor_role: "USER",
+        decision_intent: "APPROVE",
+      },
+    });
+
+    expect(result.snapshot.recommendation.type).toBe("DEFER_AND_REVIEW");
+    expect(result.snapshot.recommendation.proposed_actions).toEqual([]);
+    expect(
+      result.snapshot.warnings.some((warning) => warning.code === "AUTHORITY_VIOLATION")
+    ).toBe(true);
+    expect(result.snapshot.inputs_observed).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ input_key: "authority.actor_role", value: "USER" }),
+        expect.objectContaining({
+          input_key: "authority.decision_intent",
+          value: "APPROVE",
+        }),
+      ])
+    );
+  });
+
   describe("scenario 2 input precedence", () => {
     const basePrompt =
       "Evaluate my portfolio against the current investment policy.\n\nGenerate a decision snapshot and recommendation.";
@@ -338,7 +522,7 @@ describe("runDecision", () => {
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 100000,
-        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        weights: { EQUITIES: 0.62, BONDS: 0.33, CASH: 0.05 },
         cash_flows: {
           pending_contributions_gbp: 0,
           pending_withdrawals_gbp: 0,
@@ -347,10 +531,9 @@ describe("runDecision", () => {
       risk_inputs: defaultRiskInputs,
     });
 
-    expect(result.snapshot.outcome_state).toBe("RECOMMEND_NO_ACTION");
-    expect(result.snapshot.recommendation.type).toBe("DO_NOTHING");
+    expect(result.snapshot.outcome_state).toBe("RECOMMEND_ACTION");
+    expect(result.snapshot.recommendation.type).toBe("REBALANCE");
     expect(result.snapshot.evaluation.drift.status).toBe("computed");
-    expect(result.snapshot.evaluation.drift_analysis.bands_breached).toBe(false);
   });
 
   it("recommends rebalancing via contributions when in-band with contributions (3c prompt C)", async () => {

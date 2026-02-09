@@ -116,4 +116,25 @@ describe.sequential("policyLoader env resolution", () => {
       process.chdir(originalCwd);
     }
   });
+
+  it("fails fast when prime directive hash does not match pinned hash", async () => {
+    resetEnv();
+    delete process.env.POLICY_PATH;
+    delete process.env.ALLOW_ARTIFACTS_READ;
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ape-policy-freeze-"));
+    const primeText = "# Prime Directive Statement\n\nFrozen content.";
+    writePolicyDir({
+      dir: tmpDir,
+      filename: "policy.default.json",
+      primeFilename: "prime_directive.default.md",
+      primeText,
+    });
+
+    fs.appendFileSync(path.join(tmpDir, "prime_directive.default.md"), "\n# drift", "utf-8");
+
+    process.env.POLICY_DIR = tmpDir;
+    const { loadPolicy } = await import("./policyLoader");
+    expect(() => loadPolicy()).toThrow(/Prime Directive mismatch/i);
+  });
 });
