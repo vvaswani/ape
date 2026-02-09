@@ -59,15 +59,33 @@ function firstExisting(paths: string[]): string | null {
   return null;
 }
 
-function resolvePolicyPathFromEnv(): string | null {
+function isArtifactsPath(p: string): boolean {
+  const normalized = path.resolve(p).replace(/\\/g, "/").toLowerCase();
+  return normalized.includes("/artifacts/");
+}
+
+function assertArtifactsReadAllowed(p: string, allowArtifacts: boolean): void {
+  if (!allowArtifacts && isArtifactsPath(p)) {
+    throw new Error(
+      "Artifact policy paths are not allowed at runtime unless ALLOW_ARTIFACTS_READ=true. Set POLICY_PATH or POLICY_DIR to a non-artifacts runtime location."
+    );
+  }
+}
+
+function resolvePolicyPathFromEnv(allowArtifacts: boolean): string | null {
   const policyPathEnv = process.env.POLICY_PATH?.trim();
   if (policyPathEnv && policyPathEnv.length > 0) {
-    return path.isAbsolute(policyPathEnv) ? policyPathEnv : path.resolve(process.cwd(), policyPathEnv);
+    const resolved = path.isAbsolute(policyPathEnv)
+      ? policyPathEnv
+      : path.resolve(process.cwd(), policyPathEnv);
+    assertArtifactsReadAllowed(resolved, allowArtifacts);
+    return resolved;
   }
 
   const policyDir = process.env.POLICY_DIR?.trim();
   if (policyDir && policyDir.length > 0) {
     const baseDir = path.isAbsolute(policyDir) ? policyDir : path.resolve(process.cwd(), policyDir);
+    assertArtifactsReadAllowed(baseDir, allowArtifacts);
     const candidates = [
       path.join(baseDir, "policy.local.json"),
       path.join(baseDir, "policy.default.json"),
@@ -96,6 +114,11 @@ function resolvePrimeDirectivePath(args: {
     : ["prime_directive.default.md", "prime_directive.local.md"];
 
   const candidates = localFirst.map((name) => path.join(policyDir, name));
+  if (!allowArtifacts) {
+    for (const p of candidates) {
+      assertArtifactsReadAllowed(p, allowArtifacts);
+    }
+  }
 
   if (allowArtifacts) {
     const cwd = process.cwd();
@@ -156,7 +179,7 @@ function enforcePrimeDirectiveFreeze(args: {
  */
 export function loadPolicy(): PolicyJson {
   const allowArtifacts = process.env.ALLOW_ARTIFACTS_READ === "true";
-  const envResolved = resolvePolicyPathFromEnv();
+  const envResolved = resolvePolicyPathFromEnv(allowArtifacts);
 
   let policyPath = envResolved;
   if (!policyPath && allowArtifacts) {

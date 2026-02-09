@@ -91,6 +91,26 @@ describe.sequential("policyLoader env resolution", () => {
     expect(policy.policy_id).toBe("ape-policy");
   });
 
+  it("loads policy via POLICY_PATH when present", async () => {
+    resetEnv();
+    delete process.env.POLICY_DIR;
+    delete process.env.ALLOW_ARTIFACTS_READ;
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ape-policy-path-"));
+    const primeText = "# Prime Directive Statement\n\nTest content.";
+    writePolicyDir({
+      dir: tmpDir,
+      filename: "policy.default.json",
+      primeFilename: "prime_directive.default.md",
+      primeText,
+    });
+
+    process.env.POLICY_PATH = path.join(tmpDir, "policy.default.json");
+    const { loadPolicy } = await import("./policyLoader");
+    const policy = loadPolicy();
+    expect(policy.policy_id).toBe("ape-policy");
+  });
+
   it("allows legacy artifacts fallback only when ALLOW_ARTIFACTS_READ=true", async () => {
     resetEnv();
     delete process.env.POLICY_PATH;
