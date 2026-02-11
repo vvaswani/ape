@@ -1,0 +1,35 @@
+name: plane-sync
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  sync-plane:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Sync Plane Work Item
+        env:
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+          PLANE_API_BASE_URL: ${{ vars.PLANE_API_BASE_URL }}
+          PLANE_API_TOKEN: ${{ secrets.PLANE_API_TOKEN }}
+          PLANE_WORKSPACE_SLUG: ${{ vars.PLANE_WORKSPACE_SLUG }}
+          PLANE_PROJECT_ID: ${{ vars.PLANE_PROJECT_ID }}
+          PLANE_STATE_IN_PROGRESS_ID: ${{ vars.PLANE_STATE_IN_PROGRESS_ID }}
+          PLANE_STATE_IN_REVIEW_ID: ${{ vars.PLANE_STATE_IN_REVIEW_ID }}
+          PLANE_STATE_DONE_ID: ${{ vars.PLANE_STATE_DONE_ID }}
+          PLANE_KEY_PREFIX: ${{ vars.PLANE_KEY_PREFIX }}
+          PLANE_SYNC_STRICT: ${{ vars.PLANE_SYNC_STRICT }}
+        run: npx --yes tsx scripts/plane-sync.ts

@@ -10,12 +10,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Enforce milestone prefix on code commits
+      - name: Enforce Plane key in subject on code commits
         shell: bash
         run: |
           base="${{ github.base_ref }}"
           git fetch origin "$base":"origin/$base"
-          regex='^\[M[0-9]+[a-z]?\]\s'
+          regex='(^|[^A-Za-z0-9])(APE-[0-9]+)($|[^A-Za-z0-9])'
           fail=0
 
           while read -r sha; do
@@ -39,7 +39,7 @@ jobs:
 
             if [ "$code" -eq 1 ]; then
               echo "$subject" | grep -Eq "$regex" || {
-                echo "Missing milestone prefix in commit $sha: $subject"
+                echo "Missing Plane key in commit subject $sha: $subject"
                 fail=1
               }
             fi
