@@ -1,4 +1,4 @@
-# Investment Policy Model (IPM)
+# Portfolio Guidelines
 
 **Project:** **AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator)**  
 **Owner:** Default  
@@ -9,9 +9,9 @@
 
 ---
 
-## 1. Purpose of the Investment Policy Model
+## 1. Purpose of the Portfolio Guidelines
 
-The Investment Policy Model defines the decision boundaries within which the AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator) operates.
+The Portfolio Guidelines define the decision boundaries within which the AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator) operates.
 
 If a recommendation conflicts with this document, the recommendation is invalid.
 
@@ -133,3 +133,4 @@ Monthly check, quarterly review, ad hoc only for genuine life events.
 ### Status
 
 This document represents a **safe default policy** used when no local policy is present.
+

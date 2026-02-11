@@ -23,6 +23,7 @@
 ## 2026-02-11 — Iteration M4b (Docs Consolidation)
 ### Changed
 - Docs consolidation: removed non-authoritative duplicates; clarified authoritative doc set and policy loading boundary.
+- Terminology: rename IPM -> Portfolio Guidelines (CFA-aligned); no behavior changes.
 
 ---
 

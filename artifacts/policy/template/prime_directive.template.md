@@ -47,7 +47,7 @@ For any decision, the user can clearly answer:
 
 Success also means:
 
-* Recommendations are consistently aligned with the **Investment Policy Model (IPM)**.
+* Recommendations are consistently aligned with the **Portfolio Guidelines**.
 * Inaction is recommended when action is not justified.
 * The system produces **Decision Snapshots** that can be reviewed, compared, and audited over time.
 
@@ -66,4 +66,5 @@ Success also means:
 ## Default Safety Rule
 
 > If required inputs are missing, ambiguous, or confidence is low, the system must **pause**, ask targeted clarifying questions, or recommend **“defer and review.”**
+
 

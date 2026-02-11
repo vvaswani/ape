@@ -1,4 +1,4 @@
-# Investment Policy Model (IPM)
+# Portfolio Guidelines
 
 **Project:** **AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator)**  
 **Owner:** __OWNER__  
@@ -9,9 +9,9 @@
 
 ---
 
-## 1. Purpose of the Investment Policy Model
+## 1. Purpose of the Portfolio Guidelines
 
-The Investment Policy Model defines the **decision boundaries** within which the AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator) operates.
+The Portfolio Guidelines define the **decision boundaries** within which the AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator) operates.
 
 It serves as:
 
@@ -165,7 +165,7 @@ Calendar-based reviews are secondary and exist only to check for drift.
 - Leverage, margin, or borrowing against portfolio assets.
 - Concentrated single-asset or single-security exposure.
 - Market timing based on sentiment or short-term forecasts.
-- Strategy changes without an updated Investment Policy Model version.
+- Strategy changes without an updated Portfolio Guidelines version.
 
 ---
 
@@ -173,7 +173,7 @@ Calendar-based reviews are secondary and exist only to check for drift.
 
 - The AI Portfolio Decision Co-Pilot cannot modify policy parameters silently.
 - Any change to targets, bands, or permitted assets requires:
-  1. an updated Investment Policy Model version, and
+  1. an updated Portfolio Guidelines version, and
   2. a recorded rationale captured in a Decision Snapshot.
 
 ---
@@ -188,7 +188,7 @@ Calendar-based reviews are secondary and exist only to check for drift.
 
 ## 12. Relationship to Other Artefacts
 
-This Investment Policy Model governs and constrains:
+These Portfolio Guidelines govern and constrain:
 
 - Decision Snapshot Templates
 - Recommendation Types
@@ -202,3 +202,4 @@ If a downstream artefact conflicts with this model, the artefact must be revised
 ### Status
 
 This document is a **template** and is not intended for direct execution.
+

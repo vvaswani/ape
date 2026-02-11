@@ -121,7 +121,7 @@ When recommending no action:
 ## 4. Precedence and Governance
 
 This contract operates:
-- downstream of the Investment Policy Model and policy JSON,
+- downstream of the Portfolio Guidelines and policy JSON,
 - upstream of Decision Snapshots and Audit Logs.
 
 If explanation text conflicts with applied policy logic, **policy logic prevails**.
@@ -148,3 +148,4 @@ This document represents the **default explanation standard**.
 All explanations must reference:
 - the applied policy version, and
 - this Explanation Contract version.
+

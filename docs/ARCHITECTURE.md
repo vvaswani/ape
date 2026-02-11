@@ -20,6 +20,7 @@
 - Authoritative documents: `docs/ARCHITECTURE.md`, `docs/decisions/` (ADRs), and `docs/CHANGELOG.md`.
 - Canonical policy sources (authoring): `artifacts/policy/default/*` with optional local authoring overrides in `artifacts/local/*`.
 - Runtime policy loading is config-driven: `POLICY_PATH` -> `POLICY_DIR` -> repo artifacts only when `ALLOW_ARTIFACTS_READ=true` (dev/local only).
+> Glossary: IPS = governance document; Portfolio Guidelines = operational rules derived from IPS; Risk Profile = questionnaire output selecting guidelines; Executable Guidelines = runtime policy JSON loaded via `POLICY_PATH`/`POLICY_DIR`.
 
 ## High-level Components
 > Describe responsibility boundaries, not code structure.

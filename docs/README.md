@@ -28,5 +28,6 @@ Index only. This file must not be treated as authoritative.
 - `../artifacts/policy/default/decision-principles-catalogue.md` — Decision Principles Catalogue (policy reference).
 - `../artifacts/policy/default/decision-principles-catalogue.json` — Decision Principles Catalogue (machine-readable).
 - `../artifacts/policy/default/decision-principles-catalogue.schema.json` — JSON schema for the catalogue.
-- `../artifacts/policy/default/decision-principles-to-ipm-mapping.md` — Mapping of decision questions to IPM sections.
+- `../artifacts/policy/default/decision-principles-to-portfolio-guidelines-mapping.md` — Mapping of decision questions to Portfolio Guidelines sections.
 - Planning materials live in `planning/archive/` and are non-authoritative.
+

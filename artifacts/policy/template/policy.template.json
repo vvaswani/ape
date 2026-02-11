@@ -68,7 +68,7 @@
   },
 
   "meta": {
-    "derived_from_ipm_version": "__IPM_VERSION__",
+    "derived_from_guidelines_version": "__GUIDELINES_VERSION__",
     "notes": "Template only. Not intended for runtime execution."
   }
 }

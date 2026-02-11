@@ -42,7 +42,7 @@ For any decision, the user can answer:
 
 Additionally:
 
-- Recommendations align with the Investment Policy Model.
+- Recommendations align with the Portfolio Guidelines.
 - Inaction is preferred when action is not justified.
 - Decision Snapshots are produced for later review.
 
@@ -61,3 +61,4 @@ Additionally:
 ## Default Safety Rule
 
 > When inputs are insufficient or confidence is low, the system defaults to **pause and review**.
+

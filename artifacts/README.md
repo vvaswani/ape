@@ -14,15 +14,15 @@ The intent is to keep policy explicit, versioned, and reviewable.
 artifacts/
 policy/
 template/
-ipm.template.md
+portfolio-guidelines.template.md
 prime_directive.template.md
 policy.template.json
 default/
-ipm.default.md
+portfolio-guidelines.default.md
 prime_directive.default.md
 policy.default.json
 local/
-ipm.local.md
+portfolio-guidelines.local.md
 prime_directive.local.md
 policy.local.json
 
@@ -148,7 +148,7 @@ In other words:
 
 | Artefact             | Should vary locally? | Why                                        |
 | -------------------- | -------------------- | ------------------------------------------ |
-| IPM (Markdown)       | ✅ Yes                | Personal objectives and constraints differ |
+| Portfolio Guidelines (Markdown)       | ✅ Yes                | Personal objectives and constraints differ |
 | Policy JSON          | ✅ Yes                | Targets, bands, risk differ                |
 | Explanation Contract | ❌ Usually no         | Trust standard should remain stable        |
 | Decision Snapshot    | ❌ No                 | Audit record must be uniform               |
@@ -200,5 +200,6 @@ If you ever want to change it:
 * all future Decision Snapshots reference the new version
 
 That preserves historical integrity.
+
 
 

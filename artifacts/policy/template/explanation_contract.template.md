@@ -139,7 +139,7 @@ When recommending no action:
 
 The Explanation Contract operates downstream of:
 
-- the Investment Policy Model (IPM),
+- the Portfolio Guidelines,
 - the machine-readable policy JSON.
 
 It operates upstream of:
@@ -173,3 +173,4 @@ This document is a **template**.
 All concrete implementations must:
 - reference a specific policy version, and
 - be captured in a Decision Snapshot.
+

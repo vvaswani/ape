@@ -669,7 +669,7 @@ Schema:
 
 Important rules:
 - No market predictions. No urgency.
-- Align strictly with the Investment Policy Model and policy JSON.
+- Align strictly with the Portfolio Guidelines and policy JSON.
 - Rebalancing is a risk-management tool, not return optimisation.
 - NEVER invent missing weights or cash flows.
 - Use the policy targets and bands provided below; do not invent targets or bands.
@@ -1442,3 +1442,4 @@ function formatRiskNotes(
       return "Risk guardrails evaluated.";
   }
 }
+
