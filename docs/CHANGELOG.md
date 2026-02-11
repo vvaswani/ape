@@ -14,6 +14,14 @@
 
 ---
 
+## 2026-02-11 — Iteration M4a (Policy State Repository Seam)
+### Added
+- Added `PolicyStateRepository` seam with `JsonPolicyStateRepository` MVP for user-scoped policy lifecycle artifacts.
+- Added `POLICY_STATE_DIR` runtime configuration for policy state storage root.
+- Missing lifecycle artifacts are represented explicitly as `null` (no silent defaults).
+
+---
+
 ## 2026-01-27 — Iteration M1 (Policy Enforcement Baseline)
 ### Added
 - Policy loader with default/local artifact resolution and governance hash freeze checks.

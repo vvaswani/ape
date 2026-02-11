@@ -22,6 +22,7 @@
 - **UI / Client:** Collects chat + structured `portfolio_state`, renders chat as supportive UX, and treats Decision Snapshot as authoritative output.
 - **API / Service layer:** `POST /api/chat` validates request shape, orchestrates decision flow, applies guardrails, and emits snapshot.
 - **User context (platform):** User identity is resolved only via `UserContextProvider`; domain/business logic must be user-scoped and must not read env/auth inputs directly.
+- **Policy state repository (platform/data):** User-scoped policy lifecycle artifacts are persisted behind `PolicyStateRepository` (MVP `JsonPolicyStateRepository`) with storage root configured by `POLICY_STATE_DIR`.
 - **Data store(s):** File-based policy/config artifacts (`artifacts/policy/default/*`, optional `artifacts/local/*`) are source of truth; no DB through Milestone 3c.
 At runtime, policy must be provided via explicit configuration; repo artifacts are not valid runtime dependencies.
 Policy follows a two-layer model: an immutable, release-scoped governance bundle (policy JSON + Prime Directive markdown) is baked into the build/image and loaded in production via `POLICY_DIR` (for example, `/app/policy`), while a versioned, data-scoped user policy instance is derived from questionnaire outputs and used to set SAA (rare updates) with regular TAA overlays constrained by governance guardrails.
@@ -32,7 +33,7 @@ Policy follows a two-layer model: an immutable, release-scoped governance bundle
 - Core entities: `ChatRequest`, `PortfolioStateInput`, `PolicyJson`, `DecisionSnapshot`.
 - Key identifiers: `snapshot_id`, `policy_id`, `policy_version`.
 - Ownership / source of truth: deterministic evaluation fields owned by service logic + policy artifacts; recommendation/explanation text proposed by model then constrained by guardrails.
-- Retention / archival assumptions: snapshots are returned per request only; long-term persistence not implemented.
+- Retention / archival assumptions: snapshots are returned per request only; policy lifecycle state persists as user-scoped repository records.
 
 ## Core Flows
 ### Flow A — Governed decision with structured state
@@ -55,6 +56,7 @@ Policy follows a two-layer model: an immutable, release-scoped governance bundle
 - Deterministic policy/drift constraints have precedence over model creativity.
 - `recommendation.type` must remain within the closed enum.
 - Unsafe/invalid model outputs must degrade to safe recommendation types, not silent success.
+- Filesystem access for policy lifecycle persistence is confined to `JsonPolicyStateRepository` implementation boundaries.
 
 ## Observability (minimum)
 - Logs: server logs for policy provenance, fallback reasons, guardrail/explanation warnings; client debug logging gated by log level.
