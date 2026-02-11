@@ -33,13 +33,13 @@ for file in $changed_files; do
 done
 
 if [ "$code_change" -eq 1 ]; then
-  echo "$subject" | grep -Eq '^\[M[0-9]+[a-z]?\] ' || {
+  echo "$subject" | grep -Eq '(^|[^A-Za-z0-9])(APE-[0-9]+)($|[^A-Za-z0-9])' || {
     cat <<'EOF'
-Commit blocked: milestone prefix required for code changes.
+Commit blocked: Plane key required in commit subject for code changes.
 
-Required format:
-  [M3c] Short description
-  [M4a] Add drift guardrail tests
+Examples:
+  APE-123 Add drift guardrail tests
+  feat(api): APE-456 enforce state mapping
 
 Docs-only changes (docs/ or *.md only) do not require a prefix.
 EOF
