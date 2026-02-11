@@ -16,6 +16,11 @@
 - Environments: local Next.js runtime (`agent/`), optional Docker Compose stack.
 - Key constraints: policy-first governance, deterministic drift math, fixed recommendation vocabulary, and safe behavior under missing/invalid inputs.
 
+## Documentation & Policy Boundaries
+- Authoritative documents: `docs/ARCHITECTURE.md`, `docs/decisions/` (ADRs), and `docs/CHANGELOG.md`.
+- Canonical policy sources (authoring): `artifacts/policy/default/*` with optional local authoring overrides in `artifacts/local/*`.
+- Runtime policy loading is config-driven: `POLICY_PATH` -> `POLICY_DIR` -> repo artifacts only when `ALLOW_ARTIFACTS_READ=true` (dev/local only).
+
 ## High-level Components
 > Describe responsibility boundaries, not code structure.
 
@@ -47,7 +52,7 @@ Lifecycle ordering is explicit: IPS -> Risk Profile -> Portfolio Guidelines -> E
 3. Snapshot includes warnings/audit notes so failure is visible and reviewable.
 
 ### Flow C — Policy integrity enforcement
-1. Policy loader resolves local policy override first, then default policy artifact.
+1. Policy loader resolves runtime policy from explicit configuration (`POLICY_PATH` then `POLICY_DIR`), with artifact reads allowed only in dev/local via `ALLOW_ARTIFACTS_READ=true`.
 2. Prime Directive hash pin is checked against the relevant markdown artifact.
 3. Decision run aborts with error if policy governance freeze is violated.
 
@@ -58,6 +63,8 @@ Lifecycle ordering is explicit: IPS -> Risk Profile -> Portfolio Guidelines -> E
 - Unsafe/invalid model outputs must degrade to safe recommendation types, not silent success.
 - Filesystem access for policy lifecycle persistence is confined to `JsonPolicyStateRepository` implementation boundaries.
 - If portfolio_state exists, the system must never request weights.
+- When `portfolio_state.weights` are provided, values are decimals (0-1); incomplete/missing weights must trigger a safe path rather than 500.
+- Expected validation/model failures must return safe snapshot outcomes and should not surface as HTTP 500.
 
 ## Observability (minimum)
 - Logs: server logs for policy provenance, fallback reasons, guardrail/explanation warnings; client debug logging gated by log level.

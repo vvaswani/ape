@@ -21,9 +21,8 @@ Index only. This file must not be treated as authoritative.
 - If a supporting doc conflicts with code or ADRs, treat it as outdated.
 
 ## Supporting
-- `API.md` — Decision API contract. Update when request/response schema changes.
-- API semantics live in `docs/API.md`.
-- Type definitions live in generated docs at `docs/reference/api/` (run `cd agent && npm run docs:api`).
+- API reference is generated TypeDoc at `docs/reference/api/` (run `cd agent && npm run docs:api`).
+- Behavioral contracts and invariants are authoritative in `docs/ARCHITECTURE.md` and ADRs in `docs/decisions/`.
 - `reference/tests/README.md` — Manual test scenarios by milestone. Update when scenarios or validation steps change.
 - `../artifacts/README.md` — Policy artifact usage and precedence. Update when policy structure changes.
 - `../artifacts/policy/default/decision-principles-catalogue.md` — Decision Principles Catalogue (policy reference).

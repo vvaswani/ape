@@ -20,6 +20,10 @@
 - Added `POLICY_STATE_DIR` runtime configuration for policy state storage root.
 - Missing lifecycle artifacts are represented explicitly as `null` (no silent defaults).
 
+## 2026-02-11 — Iteration M4b (Docs Consolidation)
+### Changed
+- Docs consolidation: removed non-authoritative duplicates; clarified authoritative doc set and policy loading boundary.
+
 ---
 
 ## 2026-01-27 — Iteration M1 (Policy Enforcement Baseline)
