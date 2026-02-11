@@ -67,6 +67,11 @@ Then browse to:
 
 * This repository follows the Conventional Commits Specification for commits and pull requests.
 * Run unit tests from the `agent/` directory: `npm run test`
+* Branch names are enforced in CI and must follow:
+  * `<type>/APE<id>-<description>` or `<type>/APE-<id>-<description>`
+  * Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `build`, `perf`, `style`, `hotfix`
+  * `<id>` must be 1-3 digits, `<description>` must be lowercase kebab-case
+  * Examples: `feat/APE1-plane-sync`, `chore/APE-11-update-workflow`, `docs/APE-111-add-setup-guide`
 * Plane key required in commit subject for code changes: include `APE-<id>` (e.g., `APE-123`).
 * Example: `feat(agent): APE-123 Enforce explanation contract`
 * Docs-only changes (docs/ or *.md only) do not require a Plane key.
