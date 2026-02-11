@@ -101,3 +101,8 @@ artifacts/**/*.pdf
 
 # Local-only Codex/LLM handover notes (do not commit)
 artifacts/.codex/
+
+############################################
+# IDE local MCP config
+############################################
+.vscode/mcp.json
