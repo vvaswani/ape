@@ -16,6 +16,7 @@ Governance hash pinning is enforced through `meta.prime_directive_sha256`, so ru
 Adopt Option A for production: ship a release-scoped immutable governance policy bundle (policy JSON + Prime Directive markdown) baked into the build/image, and configure `POLICY_DIR` to that baked path (for example, `/app/policy`).
 `ALLOW_ARTIFACTS_READ` is prohibited outside development contexts.
 Runtime must fail fast on missing policy source or hash mismatch; there is no silent fallback to unpinned policies.
+Terminology alignment: this runtime package is the Executable Portfolio Guidelines bundle consumed by the decision engine.
 
 # Consequences
 - Build/release pipelines must include the policy bundle and Prime Directive in the image and record bundle hashes plus image digest at build/release time.

@@ -39,8 +39,68 @@
 - Ownership / source of truth: deterministic evaluation fields owned by service logic + runtime governance bundle (from `POLICY_DIR`, authored in artifacts); recommendation/explanation text proposed by model then constrained by guardrails.
 - Retention / archival assumptions: snapshots are returned per request only; policy lifecycle state persists as user-scoped repository records.
 
+### Policy Object Taxonomy
+- **Investment Policy Statement (IPS):** governance-level policy defining objectives, constraints, authority model, and prohibited actions; versioned and changed deliberately.
+- **Portfolio Guidelines:** operational rules derived from the IPS (asset allocation targets, rebalancing bands, turnover/execution controls, risk guardrails); versioned and adjusted through review/risk updates.
+- **Risk Profile:** questionnaire-derived classification that selects or parameterizes Portfolio Guidelines; it does not mutate the IPS.
+- **Executable Portfolio Guidelines (Runtime Policy):** deterministic machine-readable policy package loaded via `POLICY_PATH`/`POLICY_DIR` for runtime decision execution.
+
 ## Core Flows
 Lifecycle ordering is explicit: IPS -> Risk Profile -> Portfolio Guidelines -> Executable Policy. Portfolio Guidelines must not be created during IPS setup.
+### Canonical Policy Lifecycle Rule (APE)
+
+> **In APE, the Investment Policy Statement (IPS) is established first and independently.
+> Portfolio Guidelines are never created, selected, or modified during IPS setup.
+> Portfolio Guidelines are derived only after a Risk Profile exists, and always within the constraints of the IPS.**
+
+#### Authoritative sequencing (non-negotiable)
+
+This sequence is **fixed** and must not be reordered:
+
+1. **IPS Setup (Wizard)**
+   * Purpose: establish governance, intent, and constraints
+   * Output: **IPS Instance** (versioned, hashed, immutable)
+   * Explicitly excludes:
+     * asset allocation
+     * rebalancing rules
+     * execution preferences
+
+2. **Risk Questionnaire**
+   * Purpose: assess risk tolerance and capacity
+   * Output: **Risk Profile** (versioned)
+
+3. **Portfolio Guidelines Derivation**
+   * Purpose: translate Risk Profile into operational rules
+   * Input: IPS Instance + Risk Profile
+   * Output: **Portfolio Guidelines Instance**
+
+4. **Compilation**
+   * Purpose: produce deterministic runtime configuration
+   * Output: **Executable Portfolio Guidelines** (runtime policy JSON)
+
+5. **Decision Execution**
+   * Decisions are permitted only if a valid Executable Portfolio Guidelines package exists
+
+#### Hard invariants (design constraints)
+
+These are **system laws**, not conventions:
+
+* An IPS **must exist** before a Risk Profile is interpreted
+* Portfolio Guidelines **must not exist** without a Risk Profile
+* Questionnaire results **must not mutate** the IPS
+* Changes in risk posture **do not imply** IPS changes
+* IPS changes require a **new IPS instance** (versioned), never in-place mutation
+
+#### Adviser-aligned rationale (for future justification)
+
+This mirrors orthodox advisory practice:
+
+* IPS defines *permission and process*
+* Risk assessment defines *posture*
+* Portfolio construction implements *within policy*
+* Policy changes only on review or life event
+
+NOTE: Do not duplicate this content in other docs. ARCHITECTURE is authoritative.
 
 ### Flow A — Governed decision with structured state
 1. UI sends chat history plus optional structured `portfolio_state` to `POST /api/chat`.
@@ -86,4 +146,5 @@ Lifecycle ordering is explicit: IPS -> Risk Profile -> Portfolio Guidelines -> E
 ## Links
 - Decision log: `docs/decisions/`
 - Change log: `docs/CHANGELOG.md`
+
 

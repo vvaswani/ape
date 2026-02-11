@@ -24,6 +24,9 @@
 ### Changed
 - Docs consolidation: removed non-authoritative duplicates; clarified authoritative doc set and policy loading boundary.
 - Terminology: rename IPM -> Portfolio Guidelines (CFA-aligned); no behavior changes.
+- Docs: added canonical policy lifecycle rule and invariants (IPS -> Risk Profile -> Portfolio Guidelines -> Executable Guidelines).
+- Docs: standardized policy object taxonomy across architecture/ADRs (IPS, Portfolio Guidelines, Risk Profile, Executable Portfolio Guidelines).
+- Docs: codified non-negotiable policy lifecycle invariant (IPS precedes Risk Profile; Guidelines derived only after Risk Profile).
 
 ---
 
@@ -189,3 +192,4 @@
 ---
 ## Milestone 3c Marker
 Backfilled documentation is complete through Milestone 3c.
+

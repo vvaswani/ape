@@ -10,6 +10,9 @@ Accepted
 # Context
 Policy lifecycle artifacts (IPS instance, risk profile, and portfolio guidelines instance) need persisted state that is user-scoped.
 The boundary must be interface-first so JSON storage can be replaced later (for example, with PostgreSQL) without pushing filesystem concerns into domain logic.
+Terminology alignment: IPS is the governance document, Portfolio Guidelines are operational rules derived from IPS, and Risk Profile is questionnaire output used to derive/select guidelines.
+
+Invariant: “In APE, the Investment Policy Statement (IPS) is established first and independently. Portfolio Guidelines are never created, selected, or modified during IPS setup. Portfolio Guidelines are derived only after a Risk Profile exists, and always within the constraints of the IPS.”
 
 # Decision
 Introduce `PolicyStateRepository` as the persistence seam with methods for read and targeted upsert by `userId`:
