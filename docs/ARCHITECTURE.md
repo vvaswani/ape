@@ -21,6 +21,7 @@
 
 - **UI / Client:** Collects chat + structured `portfolio_state`, renders chat as supportive UX, and treats Decision Snapshot as authoritative output.
 - **API / Service layer:** `POST /api/chat` validates request shape, orchestrates decision flow, applies guardrails, and emits snapshot.
+- **User context (platform):** User identity is resolved only via `UserContextProvider`; domain/business logic must be user-scoped and must not read env/auth inputs directly.
 - **Data store(s):** File-based policy/config artifacts (`artifacts/policy/default/*`, optional `artifacts/local/*`) are source of truth; no DB through Milestone 3c.
 At runtime, policy must be provided via explicit configuration; repo artifacts are not valid runtime dependencies.
 Policy follows a two-layer model: an immutable, release-scoped governance bundle (policy JSON + Prime Directive markdown) is baked into the build/image and loaded in production via `POLICY_DIR` (for example, `/app/policy`), while a versioned, data-scoped user policy instance is derived from questionnaire outputs and used to set SAA (rare updates) with regular TAA overlays constrained by governance guardrails.

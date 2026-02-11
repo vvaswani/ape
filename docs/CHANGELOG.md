@@ -8,6 +8,12 @@
 
 ---
 
+## 2026-02-11 — Iteration M4 (User Context Abstraction Seam)
+### Added
+- Introduced `UserContextProvider` seam with `LocalUserContextProvider` (env-backed defaults via `DEFAULT_USER_ID` and `DEFAULT_USER_NAME`) to keep identity resolution platform-scoped.
+
+---
+
 ## 2026-01-27 — Iteration M1 (Policy Enforcement Baseline)
 ### Added
 - Policy loader with default/local artifact resolution and governance hash freeze checks.
