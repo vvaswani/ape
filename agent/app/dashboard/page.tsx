@@ -1,18 +1,12 @@
 import DashboardStatus from "@/components/DashboardStatus";
-import { JsonPolicyStateRepository } from "@/lib/policy/JsonPolicyStateRepository";
-import { resolveLifecycleState } from "@/lib/policy/LifecycleResolver";
-import { LocalUserContextProvider } from "@/lib/user/LocalUserContextProvider";
+import { loadDashboardLifecycle } from "@/lib/dashboard/loadDashboardLifecycle";
 
 export default async function DashboardPage() {
-  const userProvider = new LocalUserContextProvider();
-  const user = userProvider.getCurrentUser();
-
-  const policyRepository = new JsonPolicyStateRepository();
-  const policyState = await policyRepository.getPolicyState(user.userId);
-  const lifecycleState = resolveLifecycleState(policyState);
+  const { lifecycleState } = await loadDashboardLifecycle();
 
   return (
     <main className="app">
+      <p>Lifecycle: {lifecycleState}</p>
       <DashboardStatus lifecycleState={lifecycleState} />
     </main>
   );
