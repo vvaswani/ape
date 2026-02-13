@@ -30,6 +30,13 @@
 
 ---
 
+## 2026-02-13 — Iteration M4c (Dashboard Lifecycle State)
+### Added
+- Server-side dashboard loader computes lifecycle state for current user using `UserContextProvider` + `PolicyStateRepository` + `resolveLifecycleState`.
+- `/dashboard` displays the computed lifecycle state value.
+
+---
+
 ## 2026-01-27 — Iteration M1 (Policy Enforcement Baseline)
 ### Added
 - Policy loader with default/local artifact resolution and governance hash freeze checks.
