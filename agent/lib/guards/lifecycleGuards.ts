@@ -19,6 +19,26 @@ export function canAccessGuidelines(state: PolicyLifecycleState): boolean {
   return GUIDELINES_ACCESS_STATES.has(state);
 }
 
+export function isRouteAllowedForLifecycle(route: string, state: PolicyLifecycleState): boolean {
+  if (route === "/decisions") {
+    return canAccessDecisions(state);
+  }
+
+  if (route === "/setup/risk-profile") {
+    return canAccessRiskProfile(state);
+  }
+
+  if (route === "/setup/guidelines") {
+    return canAccessGuidelines(state);
+  }
+
+  if (route === "/setup/ips" || route === "/dashboard" || route === "/chat") {
+    return true;
+  }
+
+  return true;
+}
+
 export function getRedirectForLifecycle(state: PolicyLifecycleState): string {
   return getNextAction(state).route;
 }

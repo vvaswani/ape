@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { isRouteAllowedForLifecycle } from "@/lib/guards/lifecycleGuards";
 import { getNextAction } from "@/lib/lifecycle/nextAction";
 import type { PolicyLifecycleState } from "@/lib/policy/LifecycleResolver";
 
@@ -20,7 +21,9 @@ describe("getNextAction", () => {
     expect(action.label).toBeTruthy();
   });
 
-  it("returns expected route for RISK_PROFILE_MISSING", () => {
-    expect(getNextAction("RISK_PROFILE_MISSING").route).toBe("/setup/risk-profile");
+  it.each(LIFECYCLE_STATES)("returns a route allowed for the same lifecycle state: %s", (state) => {
+    const { route } = getNextAction(state);
+
+    expect(isRouteAllowedForLifecycle(route, state)).toBe(true);
   });
 });

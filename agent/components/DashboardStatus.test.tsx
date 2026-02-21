@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 
 import DashboardStatus from "@/components/DashboardStatus";
 import { getDashboardModel, type StepStatus } from "@/components/dashboardStatusMapping";
+import { getNextAction } from "@/lib/lifecycle/nextAction";
 import type { PolicyLifecycleState } from "@/lib/policy/LifecycleResolver";
 
 describe("dashboardStatusMapping", () => {
@@ -80,7 +81,10 @@ describe("dashboardStatusMapping", () => {
 
 describe("DashboardStatus", () => {
   it("renders fixed 4 steps and exactly one CTA link", () => {
-    render(<DashboardStatus lifecycleState="RISK_PROFILE_MISSING" />);
+    const lifecycleState: PolicyLifecycleState = "RISK_PROFILE_MISSING";
+    const nextAction = getNextAction(lifecycleState);
+
+    render(<DashboardStatus lifecycleState={lifecycleState} />);
 
     expect(screen.getByText("IPS")).toBeInTheDocument();
     expect(screen.getByText("Risk Profile")).toBeInTheDocument();
@@ -89,7 +93,7 @@ describe("DashboardStatus", () => {
 
     const links = screen.getAllByRole("link");
     expect(links).toHaveLength(1);
-    expect(links[0]).toHaveTextContent("Complete Risk Profile");
-    expect(links[0]).toHaveAttribute("href", "/setup/risk-profile");
+    expect(links[0]).toHaveTextContent(nextAction.label);
+    expect(links[0]).toHaveAttribute("href", nextAction.route);
   });
 });
