@@ -12,6 +12,7 @@
 ### Changed
 - Visiting `/` now performs a server-side redirect to `/dashboard` (dashboard is the default landing route).
 - Chat UI remains reachable at `/chat` (moved from `/`).
+- Server-side route guards enforce lifecycle order for `/decisions`, `/setup/risk-profile`, and `/setup/guidelines` (redirect to `/dashboard` when disallowed).
 
 ### Added
 - `/chat` route.
