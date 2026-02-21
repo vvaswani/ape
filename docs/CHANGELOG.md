@@ -17,9 +17,9 @@
 - `/chat` route.
 
 ### Manual regression checks (quick)
-- [ ] Visiting `/` redirects to `/dashboard`.
-- [ ] Visiting `/chat` renders the chat UI.
-- [ ] `/dashboard` still renders as expected.
+- Visiting `/` redirects to `/dashboard`.
+- Visiting `/chat` renders the chat UI.
+- `/dashboard` still renders as expected.
 
 ---
 
