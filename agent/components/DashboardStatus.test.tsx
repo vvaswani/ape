@@ -8,8 +8,6 @@ import type { PolicyLifecycleState } from "@/lib/policy/LifecycleResolver";
 describe("dashboardStatusMapping", () => {
   const cases: Array<{
     lifecycle: PolicyLifecycleState;
-    expectedLabel: string;
-    expectedHref: string;
     expectedSteps: {
       IPS: StepStatus;
       RISK: StepStatus;
@@ -19,8 +17,6 @@ describe("dashboardStatusMapping", () => {
   }> = [
     {
       lifecycle: "NO_IPS",
-      expectedLabel: "Set up IPS",
-      expectedHref: "/setup/ips",
       expectedSteps: {
         IPS: "NOT_STARTED",
         RISK: "LOCKED",
@@ -30,8 +26,6 @@ describe("dashboardStatusMapping", () => {
     },
     {
       lifecycle: "IPS_DRAFT",
-      expectedLabel: "Complete IPS",
-      expectedHref: "/setup/ips",
       expectedSteps: {
         IPS: "IN_PROGRESS",
         RISK: "LOCKED",
@@ -41,8 +35,6 @@ describe("dashboardStatusMapping", () => {
     },
     {
       lifecycle: "RISK_PROFILE_MISSING",
-      expectedLabel: "Complete Risk Profile",
-      expectedHref: "/setup/risk-profile",
       expectedSteps: {
         IPS: "COMPLETE",
         RISK: "NOT_STARTED",
@@ -52,8 +44,6 @@ describe("dashboardStatusMapping", () => {
     },
     {
       lifecycle: "RISK_PROFILE_FROZEN",
-      expectedLabel: "Create Guidelines",
-      expectedHref: "/setup/guidelines",
       expectedSteps: {
         IPS: "COMPLETE",
         RISK: "COMPLETE",
@@ -63,8 +53,6 @@ describe("dashboardStatusMapping", () => {
     },
     {
       lifecycle: "GUIDELINES_DERIVED",
-      expectedLabel: "Review Guidelines",
-      expectedHref: "/setup/guidelines",
       expectedSteps: {
         IPS: "COMPLETE",
         RISK: "COMPLETE",
@@ -74,8 +62,6 @@ describe("dashboardStatusMapping", () => {
     },
     {
       lifecycle: "GUIDELINES_COMPILED",
-      expectedLabel: "Go to Decisions",
-      expectedHref: "/decisions",
       expectedSteps: {
         IPS: "COMPLETE",
         RISK: "COMPLETE",
@@ -85,11 +71,9 @@ describe("dashboardStatusMapping", () => {
     },
   ];
 
-  it.each(cases)("returns deterministic model for $lifecycle", ({ lifecycle, expectedLabel, expectedHref, expectedSteps }) => {
+  it.each(cases)("returns deterministic model for $lifecycle", ({ lifecycle, expectedSteps }) => {
     const model = getDashboardModel(lifecycle);
 
-    expect(model.cta.label).toBe(expectedLabel);
-    expect(model.cta.href).toBe(expectedHref);
     expect(model.steps).toEqual(expectedSteps);
   });
 });

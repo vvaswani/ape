@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation";
 
 import { loadDashboardLifecycle } from "@/lib/dashboard/loadDashboardLifecycle";
-import { canAccessGuidelines } from "@/lib/guards/lifecycleGuards";
+import { canAccessGuidelines, getRedirectForLifecycle } from "@/lib/guards/lifecycleGuards";
 
 export default async function PortfolioGuidelinesPage() {
   const { lifecycleState } = await loadDashboardLifecycle();
 
   if (!canAccessGuidelines(lifecycleState)) {
-    redirect("/dashboard");
+    redirect(getRedirectForLifecycle(lifecycleState));
   }
 
   return (
