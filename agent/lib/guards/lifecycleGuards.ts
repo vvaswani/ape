@@ -1,4 +1,5 @@
 import type { PolicyLifecycleState } from "@/lib/policy/LifecycleResolver";
+import { getNextAction } from "@/lib/lifecycle/nextAction";
 
 const GUIDELINES_ACCESS_STATES: ReadonlySet<PolicyLifecycleState> = new Set([
   "RISK_PROFILE_FROZEN",
@@ -16,4 +17,8 @@ export function canAccessRiskProfile(state: PolicyLifecycleState): boolean {
 
 export function canAccessGuidelines(state: PolicyLifecycleState): boolean {
   return GUIDELINES_ACCESS_STATES.has(state);
+}
+
+export function getRedirectForLifecycle(state: PolicyLifecycleState): string {
+  return getNextAction(state).route;
 }

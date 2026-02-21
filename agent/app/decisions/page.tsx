@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation";
 
 import { loadDashboardLifecycle } from "@/lib/dashboard/loadDashboardLifecycle";
-import { canAccessDecisions } from "@/lib/guards/lifecycleGuards";
+import { canAccessDecisions, getRedirectForLifecycle } from "@/lib/guards/lifecycleGuards";
 
 export default async function DecisionsPage() {
   const { lifecycleState } = await loadDashboardLifecycle();
 
   if (!canAccessDecisions(lifecycleState)) {
-    redirect("/dashboard");
+    redirect(getRedirectForLifecycle(lifecycleState));
   }
 
   return (

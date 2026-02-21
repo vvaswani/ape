@@ -4,6 +4,7 @@ import {
   canAccessDecisions,
   canAccessGuidelines,
   canAccessRiskProfile,
+  getRedirectForLifecycle,
 } from "@/lib/guards/lifecycleGuards";
 
 describe("lifecycleGuards", () => {
@@ -20,5 +21,9 @@ describe("lifecycleGuards", () => {
   it("enforces guidelines access at or after RISK_PROFILE_FROZEN", () => {
     expect(canAccessGuidelines("RISK_PROFILE_MISSING")).toBe(false);
     expect(canAccessGuidelines("RISK_PROFILE_FROZEN")).toBe(true);
+  });
+
+  it("returns redirect route from lifecycle next-action mapping", () => {
+    expect(getRedirectForLifecycle("RISK_PROFILE_MISSING")).toBe("/setup/risk-profile");
   });
 });

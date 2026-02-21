@@ -1,5 +1,6 @@
 import type { PolicyLifecycleState } from "@/lib/policy/LifecycleResolver";
 import { getDashboardModel, type StepKey } from "@/components/dashboardStatusMapping";
+import { getNextAction } from "@/lib/lifecycle/nextAction";
 
 const STEP_ROWS: Array<{ key: StepKey; label: string }> = [
   { key: "IPS", label: "IPS" },
@@ -14,6 +15,7 @@ type DashboardStatusProps = {
 
 export default function DashboardStatus({ lifecycleState }: DashboardStatusProps) {
   const model = getDashboardModel(lifecycleState);
+  const nextAction = getNextAction(lifecycleState);
 
   return (
     <section className="card" style={{ padding: 16 }}>
@@ -31,8 +33,8 @@ export default function DashboardStatus({ lifecycleState }: DashboardStatusProps
       </table>
 
       <div style={{ marginTop: 12 }}>
-        <a className="btn btn--primary" href={model.cta.href}>
-          {model.cta.label}
+        <a className="btn btn--primary" href={nextAction.route}>
+          {nextAction.label}
         </a>
       </div>
     </section>
