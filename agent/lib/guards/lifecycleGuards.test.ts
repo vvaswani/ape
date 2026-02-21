@@ -5,7 +5,9 @@ import {
   canAccessGuidelines,
   canAccessRiskProfile,
   getRedirectForLifecycle,
+  isRouteAllowedForLifecycle,
 } from "@/lib/guards/lifecycleGuards";
+import { getNextAction } from "@/lib/lifecycle/nextAction";
 
 describe("lifecycleGuards", () => {
   it("enforces decisions access only for GUIDELINES_COMPILED", () => {
@@ -24,6 +26,16 @@ describe("lifecycleGuards", () => {
   });
 
   it("returns redirect route from lifecycle next-action mapping", () => {
-    expect(getRedirectForLifecycle("RISK_PROFILE_MISSING")).toBe("/setup/risk-profile");
+    expect(getRedirectForLifecycle("RISK_PROFILE_MISSING")).toBe(getNextAction("RISK_PROFILE_MISSING").route);
+  });
+
+  it("codifies route allow rules for guarded and safe routes", () => {
+    expect(isRouteAllowedForLifecycle("/setup/ips", "NO_IPS")).toBe(true);
+    expect(isRouteAllowedForLifecycle("/dashboard", "NO_IPS")).toBe(true);
+    expect(isRouteAllowedForLifecycle("/chat", "NO_IPS")).toBe(true);
+    expect(isRouteAllowedForLifecycle("/decisions", "GUIDELINES_DERIVED")).toBe(false);
+    expect(isRouteAllowedForLifecycle("/setup/risk-profile", "NO_IPS")).toBe(false);
+    expect(isRouteAllowedForLifecycle("/setup/guidelines", "RISK_PROFILE_MISSING")).toBe(false);
+    expect(isRouteAllowedForLifecycle("/unknown-route", "NO_IPS")).toBe(true);
   });
 });
