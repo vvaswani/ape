@@ -47,6 +47,7 @@
 
 ## Core Flows
 Lifecycle ordering is explicit: IPS -> Risk Profile -> Portfolio Guidelines -> Executable Policy. Portfolio Guidelines must not be created during IPS setup.
+Lifecycle order is enforced server-side via route guards using the same resolver path as the dashboard.
 ### Canonical Policy Lifecycle Rule (APE)
 
 > **In APE, the Investment Policy Statement (IPS) is established first and independently.
