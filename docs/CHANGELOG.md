@@ -34,6 +34,18 @@
 ### Added
 - Server-side dashboard loader computes lifecycle state for current user using `UserContextProvider` + `PolicyStateRepository` + `resolveLifecycleState`.
 - `/dashboard` displays the computed lifecycle state value.
+- Stub server routes for dashboard CTA destinations: `/setup/ips`, `/setup/risk-profile`, `/setup/guidelines`, and `/decisions`.
+- Each route renders a minimal Server Component with a title and `Not implemented.` placeholder.
+
+### Non-goals
+- No forms or persistence changes.
+- No API routes.
+- No route guards or middleware.
+
+### Manual regression checks (quick)
+- [ ] Each route returns 200.
+- [ ] Each page displays the correct title.
+- [ ] No client components or client hooks introduced.
 
 ---
 
