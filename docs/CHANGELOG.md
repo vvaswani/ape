@@ -8,6 +8,21 @@
 
 ---
 
+## 2026-02-21 — Default landing route: /dashboard
+### Changed
+- Visiting `/` now performs a server-side redirect to `/dashboard` (dashboard is the default landing route).
+- Chat UI remains reachable at `/chat` (moved from `/`).
+
+### Added
+- `/chat` route.
+
+### Manual regression checks (quick)
+- [ ] Visiting `/` redirects to `/dashboard`.
+- [ ] Visiting `/chat` renders the chat UI.
+- [ ] `/dashboard` still renders as expected.
+
+---
+
 ## 2026-02-11 — Iteration M4 (User Context Abstraction Seam)
 ### Added
 - Introduced `UserContextProvider` seam with `LocalUserContextProvider` (env-backed defaults via `DEFAULT_USER_ID` and `DEFAULT_USER_NAME`) to keep identity resolution platform-scoped.
