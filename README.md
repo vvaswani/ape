@@ -87,6 +87,23 @@ npm run test:watch
 npm run test:coverage
 ```
 
+Coverage outputs (from `agent/`):
+
+- HTML report: `coverage/index.html` (open this in a browser)
+- LCOV file: `coverage/lcov.info` (for tooling/CI)
+
+VS Code coverage overlay:
+
+1. Install extension: `Coverage Gutters` (`ryanluker.vscode-coverage-gutters`)
+2. Run `npm run test:coverage`
+3. In VS Code Command Palette, run `Coverage Gutters: Display Coverage`
+4. If prompted for a file, choose `agent/coverage/lcov.info`
+
+Codecov note:
+
+- Public repos can usually upload without a token.
+- Private repos should set a `CODECOV_TOKEN` repository secret.
+
 ## Repository layout
 
 This repo is a single Git repository with a service-style structure:
