@@ -8,6 +8,17 @@
 
 ---
 
+## 2026-02-22 — Iteration APE-60 (IPS Draft DTO Contract Hardening)
+### Changed
+- `POST /api/ips` now accepts a draft DTO with `content` and optional `ipsVersion` instead of the persistence-shaped IPS payload.
+- Client-supplied IPS metadata fields (for example `status`, `createdAtIso`, `ipsSha256`) are rejected with `BAD_REQUEST`; the server/repository enforces `DRAFT` status and owns persisted metadata.
+- `/setup/ips` now seeds and submits the draft DTO shape for save-draft testing.
+
+### Manual regression checks (quick)
+- [ ] Use `/setup/ips` to save a valid draft DTO and confirm `200` response is shown, then `/dashboard` shows `IPS_DRAFT`.
+- [ ] Send `POST /api/ips` with extra fields like `status` or `ipsSha256` and confirm `400` with `error.details.unknownFields`.
+- [ ] Use `/setup/ips` freeze after saving a draft and confirm freeze still returns `200` and `/dashboard` advances to `RISK_PROFILE_MISSING`.
+
 ## 2026-02-22 — Iteration APE-56 (Setup IPS UI API Exerciser)
 ### Changed
 - `/setup/ips` now provides a minimal UI to save IPS drafts and call IPS freeze using the existing APIs.

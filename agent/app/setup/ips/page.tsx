@@ -11,11 +11,8 @@ type LastResponse = {
 };
 
 const DEFAULT_DRAFT_JSON = `{
-  "ipsVersion": "v1",
-  "ipsSha256": "placeholder-sha256",
-  "status": "DRAFT",
-  "createdAtIso": "2026-02-22T00:00:00.000Z",
-  "content": "IPS draft content"
+  "content": "IPS draft content",
+  "ipsVersion": "v1"
 }`;
 
 function prettyPrintIfJson(text: string): string {

@@ -6,6 +6,14 @@ export interface IpsInstance {
   content: string;
 }
 
+export interface IpsDraftUpsertInput {
+  status: "DRAFT";
+  content: string;
+  ipsVersion?: string;
+}
+
+export type IpsUpsertInput = IpsInstance | IpsDraftUpsertInput;
+
 export interface RiskProfile {
   version: string;
   status: "MISSING" | "FROZEN";

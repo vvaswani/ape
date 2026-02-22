@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import crypto from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -47,6 +48,77 @@ describe("JsonPolicyStateRepository", () => {
       userId: "user1",
       ips,
     });
+  });
+
+  it("sets createdAtIso as draft creation time on first DTO draft save and derives metadata", async () => {
+    const repo = new JsonPolicyStateRepository();
+    const content = "IPS content";
+
+    await repo.upsertIps("user1", {
+      status: "DRAFT",
+      content,
+    });
+
+    const state = await repo.getPolicyState("user1");
+    expect(state?.userId).toBe("user1");
+    expect(state?.ips).toMatchObject({
+      ipsVersion: "v1",
+      status: "DRAFT",
+      content,
+      ipsSha256: crypto.createHash("sha256").update(content, "utf-8").digest("hex"),
+    });
+    expect(typeof state?.ips?.createdAtIso).toBe("string");
+    expect(state?.ips?.createdAtIso?.trim()).not.toBe("");
+    expect(Number.isNaN(Date.parse(state?.ips?.createdAtIso ?? ""))).toBe(false);
+  });
+
+  it("preserves createdAtIso on DTO draft overwrite and keeps existing ipsVersion when request omits it", async () => {
+    const repo = new JsonPolicyStateRepository();
+
+    await repo.upsertIps("user1", {
+      status: "DRAFT",
+      content: "First draft",
+      ipsVersion: "v9",
+    });
+    const firstState = await repo.getPolicyState("user1");
+    const firstCreatedAtIso = firstState?.ips?.createdAtIso;
+
+    await repo.upsertIps("user1", {
+      status: "DRAFT",
+      content: "Second draft",
+    });
+    const secondState = await repo.getPolicyState("user1");
+
+    expect(firstCreatedAtIso).toBeDefined();
+    expect(secondState?.ips).toMatchObject({
+      ipsVersion: "v9",
+      status: "DRAFT",
+      content: "Second draft",
+      createdAtIso: firstCreatedAtIso,
+      ipsSha256: crypto.createHash("sha256").update("Second draft", "utf-8").digest("hex"),
+    });
+  });
+
+  it("creates a new draft creation timestamp when replacing a frozen IPS with a DTO draft", async () => {
+    const repo = new JsonPolicyStateRepository();
+    const frozenIps: IpsInstance = {
+      ipsVersion: "v1",
+      ipsSha256: "abc123",
+      status: "FROZEN",
+      createdAtIso: "2026-02-11T00:00:00.000Z",
+      content: "Frozen content",
+    };
+
+    await repo.upsertIps("user1", frozenIps);
+    await repo.upsertIps("user1", {
+      status: "DRAFT",
+      content: "New draft after freeze",
+    });
+
+    const state = await repo.getPolicyState("user1");
+    expect(state?.ips?.status).toBe("DRAFT");
+    expect(state?.ips?.ipsVersion).toBe("v1");
+    expect(state?.ips?.createdAtIso).not.toBe(frozenIps.createdAtIso);
   });
 
   it("upsertRiskProfile merges without deleting ips", async () => {
