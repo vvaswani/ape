@@ -31,3 +31,23 @@
 
 ## Standing Instruction
 - Treat this file as a standing instruction for all future story implementation work in this repo.
+
+## End of PR flow
+
+- You have finished implementing the current story on a feature branch.
+
+- Do the following in order, stopping after each step and waiting for my explicit “continue”:
+- For step 2, use `gh prd` to open the PR (repo default: base `develop` on `harishkamathuk/ape`).
+
+1) Push the feature branch to origin (if not already pushed).
+2) Open a PR into `develop` (use a clear title + bullet summary + testing notes).
+3) Pause for me to review the PR.
+4) After my review, add/adjust PR description and leave PR comments where relevant (review notes, risks, follow-ups).
+5) Pause again.
+6) If the PR is safe (CI green + approvals + no unresolved threads), merge it using the standard repo method (squash or merge-commit—match existing convention).
+7) Pause again.
+8) Delete the feature branch from origin and locally.
+9) Checkout `develop`, pull latest, and confirm clean status.
+
+- At each pause: print what you did, links/commands used, and what’s next.
+- Do not merge or delete anything without my explicit “continue”.

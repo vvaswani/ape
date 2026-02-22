@@ -8,6 +8,16 @@
 
 ---
 
+## 2026-02-22 — Iteration APE-54 (IPS Freeze API)
+### Added
+- Added `POST /api/ips/freeze` to transition the current user’s IPS from `DRAFT` to `FROZEN` with deterministic state handling.
+- Freeze returns `409` when no IPS draft exists and returns idempotent `200` when the IPS is already frozen.
+
+### Manual regression checks (quick)
+- [ ] `POST /api/ips/freeze` after saving a draft returns `200` with `{"status":"FROZEN"}`.
+- [ ] `POST /api/ips/freeze` with no existing IPS draft returns `409` with `error.code = "CONFLICT"`.
+- [ ] Repeating `POST /api/ips/freeze` after freeze returns `200` with `{"status":"FROZEN"}` and no content changes.
+
 ## 2026-02-22 — Iteration APE-53 (IPS Draft Save API)
 ### Added
 - Added `POST /api/ips` to save (create/update) an IPS draft for the current user with explicit request validation and predictable error responses.
