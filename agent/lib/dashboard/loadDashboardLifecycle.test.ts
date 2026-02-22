@@ -31,10 +31,14 @@ describe("loadDashboardLifecycle", () => {
     expect(result).toEqual({
       userId: "u123",
       lifecycleState: "NO_IPS",
+      nextAction: {
+        route: "/setup/ips",
+        label: "Set up IPS",
+      },
     });
   });
 
-  it("resolves IPS_DRAFT when IPS is draft", async () => {
+  it("resolves IPS_DRAFT and IPS CTA when IPS is draft", async () => {
     const userProvider: UserContextProvider = {
       getCurrentUser: vi.fn(() => ({
         userId: "u123",
@@ -61,6 +65,97 @@ describe("loadDashboardLifecycle", () => {
     const result = await loadDashboardLifecycle({ userProvider, policyRepo });
 
     expect(policyRepo.getPolicyState).toHaveBeenCalledWith("u123");
-    expect(result.lifecycleState).toBe("IPS_DRAFT");
+    expect(result).toEqual({
+      userId: "u123",
+      lifecycleState: "IPS_DRAFT",
+      nextAction: {
+        route: "/setup/ips",
+        label: "Complete IPS",
+      },
+    });
+  });
+
+  it("resolves RISK_PROFILE_MISSING and risk profile CTA when IPS is frozen", async () => {
+    const userProvider: UserContextProvider = {
+      getCurrentUser: vi.fn(() => ({
+        userId: "u123",
+        displayName: "User 123",
+        authType: "LOCAL_FAKE",
+      })),
+    };
+    const policyRepo: PolicyStateRepository = {
+      getPolicyState: vi.fn(async (userId: string) => ({
+        userId,
+        ips: {
+          ipsVersion: "v1",
+          ipsSha256: "abc123",
+          status: "FROZEN",
+          createdAtIso: "2026-02-12T00:00:00.000Z",
+          content: "ips",
+        },
+      })),
+      upsertIps: vi.fn(async () => undefined),
+      upsertRiskProfile: vi.fn(async () => undefined),
+      upsertGuidelines: vi.fn(async () => undefined),
+    };
+
+    const result = await loadDashboardLifecycle({ userProvider, policyRepo });
+
+    expect(policyRepo.getPolicyState).toHaveBeenCalledWith("u123");
+    expect(result).toEqual({
+      userId: "u123",
+      lifecycleState: "RISK_PROFILE_MISSING",
+      nextAction: {
+        route: "/setup/risk-profile",
+        label: "Complete Risk Profile",
+      },
+    });
+  });
+
+  it("resolves NO_IPS and IPS CTA when policy state exists but ips is missing", async () => {
+    const userProvider: UserContextProvider = {
+      getCurrentUser: vi.fn(() => ({
+        userId: "u123",
+        displayName: "User 123",
+        authType: "LOCAL_FAKE",
+      })),
+    };
+    const policyRepo: PolicyStateRepository = {
+      getPolicyState: vi.fn(async (userId: string) => ({
+        userId,
+      })),
+      upsertIps: vi.fn(async () => undefined),
+      upsertRiskProfile: vi.fn(async () => undefined),
+      upsertGuidelines: vi.fn(async () => undefined),
+    };
+
+    const result = await loadDashboardLifecycle({ userProvider, policyRepo });
+
+    expect(policyRepo.getPolicyState).toHaveBeenCalledWith("u123");
+    expect(result).toEqual({
+      userId: "u123",
+      lifecycleState: "NO_IPS",
+      nextAction: {
+        route: "/setup/ips",
+        label: "Set up IPS",
+      },
+    });
+  });
+
+  it("throws deterministically when user context provider throws", async () => {
+    const userProvider: UserContextProvider = {
+      getCurrentUser: vi.fn(() => {
+        throw new Error("auth unavailable");
+      }),
+    };
+    const policyRepo: PolicyStateRepository = {
+      getPolicyState: vi.fn(async () => null),
+      upsertIps: vi.fn(async () => undefined),
+      upsertRiskProfile: vi.fn(async () => undefined),
+      upsertGuidelines: vi.fn(async () => undefined),
+    };
+
+    await expect(loadDashboardLifecycle({ userProvider, policyRepo })).rejects.toThrow("auth unavailable");
+    expect(policyRepo.getPolicyState).not.toHaveBeenCalled();
   });
 });

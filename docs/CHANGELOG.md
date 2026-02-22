@@ -8,6 +8,16 @@
 
 ---
 
+## 2026-02-22 — Iteration APE-55 (Dashboard Lifecycle Reflects Persisted IPS)
+### Changed
+- Dashboard now resolves and exposes the current lifecycle state and next CTA route from persisted policy state for the current user (server-side).
+- Dashboard lifecycle/CTA output advances deterministically from IPS missing, IPS draft, and IPS frozen states using the existing lifecycle resolver and next-action mapping.
+
+### Manual regression checks (quick)
+- [ ] With no persisted IPS for the current user, `/dashboard` shows `NO_IPS` and next CTA route `/setup/ips`.
+- [ ] After saving an IPS draft, `/dashboard` shows `IPS_DRAFT` and next CTA route `/setup/ips`.
+- [ ] After freezing the IPS, `/dashboard` shows `RISK_PROFILE_MISSING` and next CTA route `/setup/risk-profile`.
+
 ## 2026-02-22 — Iteration APE-54 (IPS Freeze API)
 ### Added
 - Added `POST /api/ips/freeze` to transition the current user’s IPS from `DRAFT` to `FROZEN` with deterministic state handling.
