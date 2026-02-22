@@ -89,6 +89,35 @@ describe("POST /api/ips", () => {
     expect(policyRepo.upsertIps).not.toHaveBeenCalled();
   });
 
+  it("returns 400 with unknown field details and does not call repo", async () => {
+    const userProvider = createUserProvider("u123");
+    const policyRepo = createPolicyRepo();
+    const handler = createPostHandler({ userProvider, policyRepo });
+
+    const response = await handler(
+      new Request("http://localhost/api/ips", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...createValidDraft(),
+          extraField: "nope",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "BAD_REQUEST",
+        message: "Request body contains unsupported fields.",
+        details: {
+          unknownFields: ["extraField"],
+        },
+      },
+    });
+    expect(policyRepo.upsertIps).not.toHaveBeenCalled();
+  });
+
   it("maps known repo invalid-userId errors to 400", async () => {
     const userProvider = createUserProvider("bad/user");
     const policyRepo = createPolicyRepo({
@@ -114,6 +143,62 @@ describe("POST /api/ips", () => {
         message: "Invalid user identifier.",
       },
     });
+  });
+
+  it("returns 401 when user context is unavailable", async () => {
+    const userProvider: UserContextProvider = {
+      getCurrentUser: vi.fn(() => {
+        throw new Error("auth unavailable");
+      }),
+    };
+    const policyRepo = createPolicyRepo();
+    const handler = createPostHandler({ userProvider, policyRepo });
+
+    const response = await handler(
+      new Request("http://localhost/api/ips", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(createValidDraft()),
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "UNAUTHORIZED",
+        message: "User context unavailable.",
+      },
+    });
+    expect(policyRepo.upsertIps).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 for unexpected repository errors without leaking details", async () => {
+    const policyRepo = createPolicyRepo({
+      upsertIps: vi.fn(async () => {
+        throw new Error("disk exploded");
+      }),
+    });
+    const handler = createPostHandler({
+      userProvider: createUserProvider("u123"),
+      policyRepo,
+    });
+
+    const response = await handler(
+      new Request("http://localhost/api/ips", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(createValidDraft()),
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "INTERNAL",
+        message: "Internal error",
+      },
+    });
+    expect(policyRepo.upsertIps).toHaveBeenCalledTimes(1);
   });
 
   it("returns 400 when request body is malformed JSON", async () => {
