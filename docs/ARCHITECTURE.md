@@ -147,11 +147,11 @@ NOTE: Do not duplicate this content in other docs. ARCHITECTURE is authoritative
 
 ## Decision Entry Points (Authoritative)
 - This section is the single source of truth for current decision trigger paths in the repo.
-- Current decision execution entrypoint (verified):
+- Current decision execution entrypoint (as implemented today):
   - `POST /api/chat` -> `agent/app/api/chat/route.ts` (`POST`) -> `agent/lib/services/decisionService.ts` (`runDecision(...)`)
-  - Current UI caller to that route: `agent/app/chat/page.tsx` -> `agent/components/ChatPage.tsx` (`fetch("/api/chat")`)
-- `POST /api/chat` is the temporary reference contract boundary used for Milestone 1 scenario proofs today, until a GUI-native decision entrypoint exists.
-- `agent/app/dashboard/page.tsx`, `agent/app/setup/ips/page.tsx`, `agent/app/setup/risk-profile/page.tsx`, `agent/app/setup/guidelines/page.tsx`, and `agent/app/decisions/page.tsx` are currently UI shells/lifecycle routing surfaces and do not trigger the decision pipeline yet.
+  - Current UI caller to that route (non-authoritative): `agent/app/chat/page.tsx` -> `agent/components/ChatPage.tsx` (`fetch("/api/chat")`)
+- `POST /api/chat` is the temporary reference contract boundary used for Milestone 1 scenario proofs today, until another decision entrypoint is introduced.
+- `agent/app/dashboard/page.tsx`, `agent/app/setup/ips/page.tsx`, `agent/app/setup/risk-profile/page.tsx`, `agent/app/setup/guidelines/page.tsx`, and `agent/app/decisions/page.tsx` are currently UI routes (lifecycle-driven) and do not trigger the decision pipeline yet.
 
 ## Links
 - Decision log: `docs/decisions/`
