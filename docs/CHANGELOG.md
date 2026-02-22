@@ -8,6 +8,15 @@
 
 ---
 
+## 2026-02-22 — Iteration APE-53 (IPS Draft Save API)
+### Added
+- Added `POST /api/ips` to save (create/update) an IPS draft for the current user with explicit request validation and predictable error responses.
+
+### Manual regression checks (quick)
+- [ ] `curl -s -X POST http://localhost:3000/api/ips -H "Content-Type: application/json" --data "{\"ipsVersion\":\"v1\",\"ipsSha256\":\"abc123\",\"status\":\"DRAFT\",\"createdAtIso\":\"2026-02-22T00:00:00.000Z\",\"content\":\"IPS draft\"}"` returns `200` with `{"status":"DRAFT"}`.
+- [ ] `curl -s -X POST http://localhost:3000/api/ips -H "Content-Type: application/json" --data "{\"ipsVersion\":\"v1\",\"ipsSha256\":\"abc123\",\"status\":\"FROZEN\",\"createdAtIso\":\"2026-02-22T00:00:00.000Z\",\"content\":\"IPS draft\"}"` returns `400` with `error.code = "BAD_REQUEST"`.
+- [ ] `curl -s -X POST http://localhost:3000/api/ips -H "Content-Type: application/json" --data "{\"ipsVersion\":\"v1\"}"` returns `400` with `error.code = "BAD_REQUEST"`.
+
 ## 2026-02-22 — Iteration APE-50 (Snapshot Auditability Hardening)
 ### Changed
 - Decision Snapshot API contract now includes machine-addressable `inputs_provenance` and `inputs_evaluated` fields for `risk_inputs` and `authority`.
