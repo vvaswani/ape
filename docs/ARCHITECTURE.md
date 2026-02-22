@@ -161,7 +161,7 @@ NOTE: Do not duplicate this content in other docs. ARCHITECTURE is authoritative
 - Mode B (Target) - Server-derived:
   - Target mode only (not implemented today): source of truth for governance inputs is session and/or persisted policy/user state.
   - Contract requirement: snapshot provenance MUST record derivation source and timestamp/identifier when server-derived governance inputs are used.
-  - Current snapshot contract does not yet expose dedicated derivation provenance keys (for example, no explicit `provenance` / `observed_at_boundary` field).
+  - Snapshot contract now exposes machine-addressable governance input status via `inputs_provenance` and `inputs_evaluated`; future server-derived mode still requires derivation source timestamp/identifier details.
 - Missing-input stance (explicit):
   - No silent defaults for governance inputs (`risk_inputs`, `authority`).
   - For Milestone scenario proofs, governance inputs must be explicitly supplied via the canonical decision boundary used by tests.

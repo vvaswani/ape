@@ -104,6 +104,14 @@ describe("Decision Snapshot contract (M3b)", () => {
     expect(typeof evalBlock.drift.bands_breached).toBe("boolean");
 
     expect(evalBlock.correctness.status).toBe("pass");
+    expect(result.snapshot.inputs_provenance).toEqual({
+      risk_inputs: "supplied",
+      authority: "derived",
+    });
+    expect(result.snapshot.inputs_evaluated).toEqual({
+      risk_inputs: true,
+      authority: true,
+    });
   });
 
   it("does not request weights when portfolio_state exists but weights are missing", async () => {
@@ -174,5 +182,17 @@ describe("Decision Snapshot contract (M3b)", () => {
 
     expect(result.snapshot.evaluation.drift.status).toBe("not_applicable");
     expect(result.snapshot.evaluation.correctness.status).toBe("indeterminate");
+    expect(result.snapshot.inputs_provenance).toEqual({
+      risk_inputs: "missing",
+      authority: "derived",
+    });
+    expect(result.snapshot.inputs_evaluated).toEqual({
+      risk_inputs: false,
+      authority: true,
+    });
+    expect(result.snapshot.inputs_provenance.risk_inputs).not.toBeNull();
+    expect(result.snapshot.inputs_provenance.authority).not.toBeNull();
+    expect(typeof result.snapshot.inputs_evaluated.risk_inputs).toBe("boolean");
+    expect(typeof result.snapshot.inputs_evaluated.authority).toBe("boolean");
   });
 });
