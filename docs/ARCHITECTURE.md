@@ -150,7 +150,7 @@ NOTE: Do not duplicate this content in other docs. ARCHITECTURE is authoritative
 - Current decision execution entrypoint (as implemented today):
   - `POST /api/chat` -> `agent/app/api/chat/route.ts` (`POST`) -> `agent/lib/services/decisionService.ts` (`runDecision(...)`)
   - Current UI caller to that route (non-authoritative): `agent/app/chat/page.tsx` -> `agent/components/ChatPage.tsx` (`fetch("/api/chat")`)
-- `POST /api/chat` is the temporary reference contract boundary used for Milestone 1 scenario proofs today, until another decision entrypoint is introduced.
+- `POST /api/chat` remains a temporary route into the decision service, but Milestone scenario proofs use the canonical decision boundary via the test harness (`runDecision(...)`).
 
 ## Governance Inputs at Decision Boundary
 - Decision Boundary (in this repo): the canonical invocation point that mints a Decision Snapshot (test harness / canonical decision entrypoint), not UI surfaces.
