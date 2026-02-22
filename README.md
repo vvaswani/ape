@@ -80,6 +80,7 @@ Then browse to:
 ### Tests (Local)
 
 From the repo root, run coverage with `cd agent && npm run test:coverage`.
+Type-only file guardrail (local): `cd agent && npm run check:types-type-only`.
 
 From `agent/`:
 
