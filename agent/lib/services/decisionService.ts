@@ -421,6 +421,14 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
       outcome_state: "ERROR_NONRECOVERABLE",
       inputs_observed: [],
       inputs_missing: [],
+      inputs_provenance: {
+        risk_inputs: "missing",
+        authority: "missing",
+      },
+      inputs_evaluated: {
+        risk_inputs: false,
+        authority: false,
+      },
       policy_items_referenced: [],
       warnings: [],
       errors: [
@@ -622,6 +630,18 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
     risk_inputs: riskInputs,
     has_state: !!state,
   });
+  const inputsProvenance = {
+    risk_inputs: req.risk_inputs ? ("supplied" as const) : ("missing" as const),
+    authority: req.authority ? ("supplied" as const) : ("derived" as const),
+  };
+  const inputsEvaluated = {
+    risk_inputs:
+      inputsProvenance.risk_inputs !== "missing" &&
+      typeof riskInputs?.risk_capacity_breached === "boolean" &&
+      typeof riskInputs?.rolling_12m_drawdown_pct === "number" &&
+      Number.isFinite(riskInputs.rolling_12m_drawdown_pct),
+    authority: true,
+  };
 
   const preflightOverride: RecommendationType | null = authorityViolation
     ? "DEFER_AND_REVIEW"
@@ -1080,6 +1100,8 @@ Portfolio state has NOT been provided.
     outcome_state: outcomeState,
     inputs_observed: inputsObserved,
     inputs_missing: outcomeState === "CANNOT_DECIDE_MISSING_INPUTS" ? missingInputs : [],
+    inputs_provenance: inputsProvenance,
+    inputs_evaluated: inputsEvaluated,
     policy_items_referenced: policyItems,
     warnings,
     errors,

@@ -8,6 +8,17 @@
 
 ---
 
+## 2026-02-22 — Iteration APE-50 (Snapshot Auditability Hardening)
+### Changed
+- Decision Snapshot API contract now includes machine-addressable `inputs_provenance` and `inputs_evaluated` fields for `risk_inputs` and `authority`.
+- Snapshot output explicitly records missing governance input status in the new fields without using ambiguous nulls.
+- Decision logic and guardrail outcomes remain unchanged; this is a contract hardening update only.
+
+### Manual regression checks (quick)
+- [ ] Snapshot responses include `inputs_provenance` and `inputs_evaluated` on supplied-input and missing-input paths.
+- [ ] `inputs_evaluated.risk_inputs` is `false` when `risk_inputs` is missing.
+- [ ] Representative scenario decisions (e.g., no-action, risk breach, unauthorized authority) remain unchanged.
+
 ## 2026-02-21 — Default landing route: /dashboard
 ### Changed
 - Visiting `/` now performs a server-side redirect to `/dashboard` (dashboard is the default landing route).

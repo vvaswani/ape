@@ -34,6 +34,18 @@ export interface InputMissing {
   impact: string;
 }
 
+export type SnapshotInputProvenance = "supplied" | "derived" | "missing";
+
+export interface SnapshotInputsProvenance {
+  risk_inputs: SnapshotInputProvenance;
+  authority: SnapshotInputProvenance;
+}
+
+export interface SnapshotInputsEvaluated {
+  risk_inputs: boolean;
+  authority: boolean;
+}
+
 export interface PolicyItemReference {
   dpq_id: string;
   ipm_section_heading?: string;
@@ -89,6 +101,8 @@ export interface DecisionSnapshot {
 
   inputs_observed: InputObserved[];
   inputs_missing: InputMissing[];
+  inputs_provenance: SnapshotInputsProvenance;
+  inputs_evaluated: SnapshotInputsEvaluated;
 
   policy_items_referenced: PolicyItemReference[];
 
