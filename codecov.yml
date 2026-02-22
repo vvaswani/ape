@@ -1,0 +1,22 @@
+# Temporary baseline for APE-59: make PR coverage feedback patch-focused and actionable.
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  status:
+    patch:
+      default:
+        target: 80%
+        informational: false
+    project:
+      default:
+        informational: true
+
+ignore:
+  # Temporary exclusions for thin framework route wrappers while patch coverage is the primary gate.
+  - "agent/app/**/page.tsx"
+  - "agent/app/**/layout.tsx"
+  # Re-export barrels add noise to project coverage without meaningful execution risk.
+  - "**/index.ts"
+  # Type declarations/interfaces do not contain executable runtime logic.
+  - "agent/**/types.ts"
