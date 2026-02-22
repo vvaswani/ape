@@ -79,6 +79,8 @@ Then browse to:
 
 ### Tests (Local)
 
+From the repo root, run coverage with `cd agent && npm run test:coverage`.
+
 From `agent/`:
 
 ```bash

@@ -19,10 +19,14 @@ export default defineConfig({
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "coverage",
       include: ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}", "lib/**/*.{ts,tsx}"],
-      lines: 80,
-      functions: 80,
-      statements: 80,
-      branches: 75,
+      // Temporary baseline for APE-59: patch coverage is enforced in Codecov, while local global
+      // thresholds remain a lightweight safety net for the current repo-wide baseline.
+      thresholds: {
+        lines: 70,
+        functions: 80,
+        statements: 70,
+        branches: 78,
+      },
       exclude: [
         "node_modules/",
         ".next/",
@@ -31,7 +35,10 @@ export default defineConfig({
         "**/*.d.ts",
         "**/*.test.{ts,tsx}",
         "**/*.spec.{ts,tsx}",
+        "app/**/page.tsx",
         "app/**/layout.tsx",
+        "**/index.ts",
+        "**/types.ts",
       ],
     }
   }
