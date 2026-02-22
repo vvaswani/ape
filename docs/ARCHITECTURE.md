@@ -151,6 +151,25 @@ NOTE: Do not duplicate this content in other docs. ARCHITECTURE is authoritative
   - `POST /api/chat` -> `agent/app/api/chat/route.ts` (`POST`) -> `agent/lib/services/decisionService.ts` (`runDecision(...)`)
   - Current UI caller to that route (non-authoritative): `agent/app/chat/page.tsx` -> `agent/components/ChatPage.tsx` (`fetch("/api/chat")`)
 - `POST /api/chat` is the temporary reference contract boundary used for Milestone 1 scenario proofs today, until another decision entrypoint is introduced.
+
+## Governance Inputs at Decision Boundary
+- Decision Boundary (in this repo): the canonical invocation point that mints a Decision Snapshot (test harness / canonical decision entrypoint), not UI surfaces.
+- Mode A (Allowed today) - Boundary-supplied:
+  - Observed governance inputs at the boundary (request payload / invocation args source of truth): `risk_inputs`, `risk_inputs.rolling_12m_drawdown_pct`, `risk_inputs.risk_capacity_breached`, `authority`, `authority.actor_role`, `authority.decision_intent`.
+  - Current implementation records supplied governance inputs in snapshot `inputs_observed[]` entries with `source: "request"`.
+  - Contract requirement: boundary-supplied governance inputs MUST be recorded in snapshot provenance as observed/supplied at the boundary (current implementation uses `inputs_observed[]` + `source`).
+- Mode B (Target) - Server-derived:
+  - Target mode only (not implemented today): source of truth for governance inputs is session and/or persisted policy/user state.
+  - Contract requirement: snapshot provenance MUST record derivation source and timestamp/identifier when server-derived governance inputs are used.
+  - Current snapshot contract does not yet expose dedicated derivation provenance keys (for example, no explicit `provenance` / `observed_at_boundary` field).
+- Missing-input stance (explicit):
+  - No silent defaults for governance inputs (`risk_inputs`, `authority`).
+  - For Milestone scenario proofs, governance inputs must be explicitly supplied via the canonical decision boundary used by tests.
+  - If governance inputs are absent, snapshot MUST record missing inputs explicitly; current implementation supports explicit missing-input recording via `inputs_missing[]`.
+  - Example contract intent (not a current snapshot key): `missing_at_boundary: [risk_inputs, authority]`.
+- Positioning:
+  - Phase A proofs run via canonical decision boundary (test harness).
+  - `/api/chat`, if present, is legacy and non-authoritative and may be removed.
 - `agent/app/dashboard/page.tsx`, `agent/app/setup/ips/page.tsx`, `agent/app/setup/risk-profile/page.tsx`, `agent/app/setup/guidelines/page.tsx`, and `agent/app/decisions/page.tsx` are currently UI routes (lifecycle-driven) and do not trigger the decision pipeline yet.
 
 ## Links
