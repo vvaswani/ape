@@ -8,6 +8,16 @@
 
 ---
 
+## 2026-02-22 — Iteration APE-56 (Setup IPS UI API Exerciser)
+### Changed
+- `/setup/ips` now provides a minimal UI to save IPS drafts and call IPS freeze using the existing APIs.
+- The page displays API response status and payload plainly for draft-save, freeze, and error paths.
+
+### Manual regression checks (quick)
+- [ ] Use `/setup/ips` to save a valid draft and confirm `200` response is shown, then `/dashboard` shows `IPS_DRAFT`.
+- [ ] Use `/setup/ips` to freeze and confirm `200` response is shown, then `/dashboard` shows `RISK_PROFILE_MISSING`.
+- [ ] Use `/setup/ips` freeze with no draft and confirm `409` error is shown plainly in the UI.
+
 ## 2026-02-22 — Iteration APE-55 (Dashboard Lifecycle Reflects Persisted IPS)
 ### Changed
 - Dashboard now resolves and exposes the current lifecycle state and next CTA route from persisted policy state for the current user (server-side).
