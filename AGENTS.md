@@ -24,5 +24,10 @@
 - In final handoff, confirm the current branch name.
 - Prefer user-facing wording in docs/changelog; keep internal implementation terms (for example, `upsert`) to code-level APIs when possible.
 
+## PR Workflow (Repo-Specific)
+- This repo opens PRs against `harishkamathuk/ape` with base branch `develop`.
+- Prefer `gh prd` (GitHub CLI alias) for PR creation, which expands to `gh pr create -R harishkamathuk/ape --base develop`.
+- Push feature branches to `origin` (fork), not `upstream`.
+
 ## Standing Instruction
 - Treat this file as a standing instruction for all future story implementation work in this repo.
