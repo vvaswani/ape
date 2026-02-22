@@ -163,10 +163,10 @@ NOTE: Do not duplicate this content in other docs. ARCHITECTURE is authoritative
   - Contract requirement: snapshot provenance MUST record derivation source and timestamp/identifier when server-derived governance inputs are used.
   - Snapshot contract now exposes machine-addressable governance input status via `inputs_provenance` and `inputs_evaluated`; future server-derived mode still requires derivation source timestamp/identifier details.
 - Missing-input stance (explicit):
-  - No silent defaults for governance inputs (`risk_inputs`, `authority`).
+  - No silent default is used for `risk_inputs`; current implementation typically derives `authority` when it is not supplied at the decision boundary.
   - For Milestone scenario proofs, governance inputs must be explicitly supplied via the canonical decision boundary used by tests.
   - If governance inputs are absent, snapshot MUST record missing inputs explicitly; current implementation supports explicit missing-input recording via `inputs_missing[]`.
-  - Example contract intent (not a current snapshot key): `missing_at_boundary: [risk_inputs, authority]`.
+  - Missing governance inputs are recorded explicitly via `inputs_provenance.<field> = "missing"`, and snapshots may also include `inputs_missing[]` entries listing missing fields.
 - Positioning:
   - Phase A proofs run via canonical decision boundary (test harness).
   - `/api/chat`, if present, is legacy and non-authoritative and may be removed.
