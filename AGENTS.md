@@ -29,6 +29,15 @@
 - Prefer `gh prd` (GitHub CLI alias) for PR creation, which expands to `gh pr create -R harishkamathuk/ape --base develop`.
 - Push feature branches to `origin` (fork), not `upstream`.
 
+## PR Workflow (Checkpointed, Codex-safe)
+- Never work on `develop`; verify branch before edits and before commit.
+- Do not merge or delete branches without explicit `continue`.
+- Pre-flight (read-only) before any mutating command (`push` / PR create): run `git branch --show-current`, `git status`, `git diff --stat develop..HEAD`, and `git log --oneline --decorate -5`; then stop and wait for `continue`.
+- Push (mutating) only after `continue`: run `git push -u origin <branch>`; then stop and wait for `continue`.
+- PR creation (mutating) only after `continue`: create a real body file by running `mkdir -p tmp` and writing the PR body to `tmp/pr-<ticket>.md`; then create the PR with `gh prd --title "<ticket> — <title>" --body-file tmp/pr-<ticket>.md`.
+- PR body rule: do not include internal file paths in PR descriptions.
+- Post-PR pause: stop after PR creation for CI/review; do not merge or delete until explicit instruction.
+
 ## Standing Instruction
 - Treat this file as a standing instruction for all future story implementation work in this repo.
 
