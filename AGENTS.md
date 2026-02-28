@@ -14,6 +14,26 @@
 - Run the repo-standard full test command before final handoff when feasible.
 - If tests cannot run, state the exact command attempted, the exact failure, and whether the issue is code-related or environment/setup-related.
 
+## Error Handling Rule: Third-Route Trigger (Typed Codes)
+- Rule:
+- 1st occurrence: simplest handling is allowed.
+- 2nd occurrence: duplication is tolerated but must be noted.
+- 3rd occurrence: STOP and extract typed error codes first.
+- Prohibited:
+- Never introduce new substring-based mapping in a 3rd route.
+- Never let `error.message.includes(...)` spread beyond the existing two routes; if none exist, avoid it entirely.
+- When triggered:
+- Introduce or extend minimal typed errors (`RepoError` + `code`).
+- Update existing routes to use typed mapping.
+- Implement the new route using typed codes.
+- Keep the API error envelope unchanged.
+- Scope guardrails:
+- Do not extract a shared "error framework" unless 3+ routes need it.
+- Keep mapping local unless and until a second route needs the same helper.
+- Codex operating instruction:
+- When implementing a new API route, Codex must first check whether the third-route trigger applies.
+- If it applies, Codex must implement typed codes first (APE-61-style), then proceed.
+
 ## Docs Consistency Check
 - Include a Doc Impact Check in the final summary for every story: `ARCHITECTURE` / `CHANGELOG` / `ADR` with yes/no and a one-line reason for each.
 - Do not create/update `docs/ARCHITECTURE.md` or `docs/decisions/*` unless the story materially changes system structure, invariants, or durable architectural decisions.
