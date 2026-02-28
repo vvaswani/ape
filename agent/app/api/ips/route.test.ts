@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { createPostHandler } from "@/app/api/ips/route";
+import { RepoError } from "@/lib/policy/errors";
 import type { PolicyStateRepository } from "@/lib/policy/PolicyStateRepository";
 import type { IpsInstance, IpsUpsertInput, PolicyState } from "@/lib/policy/types";
 import type { UserContextProvider } from "@/lib/user/UserContextProvider";
@@ -251,7 +252,7 @@ describe("POST /api/ips", () => {
     const userProvider = createUserProvider("bad/user");
     const policyRepo = createPolicyRepo({
       upsertIps: vi.fn(async () => {
-        throw new Error("Invalid userId format: bad/user");
+        throw new RepoError("INVALID_USER_ID", "Invalid userId format", { userId: "bad/user" });
       }),
     });
     const handler = createPostHandler({ userProvider, policyRepo });
@@ -270,6 +271,9 @@ describe("POST /api/ips", () => {
       error: {
         code: "BAD_REQUEST",
         message: "Invalid user identifier.",
+        details: {
+          reason: "INVALID_USER_ID",
+        },
       },
     });
   });

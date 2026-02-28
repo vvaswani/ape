@@ -1,4 +1,5 @@
 import * as fs from "node:fs/promises";
+import { RepoError } from "@/lib/policy/errors";
 
 const SAFE_USER_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
@@ -8,7 +9,7 @@ export async function ensureDirExists(dirPath: string): Promise<void> {
 
 export function safeUserIdToFilename(userId: string): string {
   if (!SAFE_USER_ID_PATTERN.test(userId)) {
-    throw new Error(`Invalid userId format: ${userId}`);
+    throw new RepoError("INVALID_USER_ID", "Invalid userId format", { userId });
   }
 
   return `${userId}.json`;

@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { JsonPolicyStateRepository } from "@/lib/policy/JsonPolicyStateRepository";
+import { RepoError } from "@/lib/policy/errors";
 import type { GuidelinesInstance, IpsInstance, RiskProfile } from "@/lib/policy/types";
 
 describe("JsonPolicyStateRepository", () => {
@@ -191,8 +192,16 @@ describe("JsonPolicyStateRepository", () => {
       content: "IPS content",
     };
 
-    await expect(repo.upsertIps("../bad-user", ips)).rejects.toThrow("Invalid userId format");
-    await expect(repo.getPolicyState("../bad-user")).rejects.toThrow("Invalid userId format");
+    await expect(repo.upsertIps("../bad-user", ips)).rejects.toMatchObject({
+      name: "RepoError",
+      code: "INVALID_USER_ID",
+      message: "Invalid userId format",
+    });
+    await expect(repo.getPolicyState("../bad-user")).rejects.toMatchObject({
+      name: "RepoError",
+      code: "INVALID_USER_ID",
+      message: "Invalid userId format",
+    });
   });
 
   it("unsafe userId throws for slash", async () => {
@@ -205,7 +214,11 @@ describe("JsonPolicyStateRepository", () => {
       content: "IPS content",
     };
 
-    await expect(repo.upsertIps("bad/user", ips)).rejects.toThrow("Invalid userId format");
+    await expect(repo.upsertIps("bad/user", ips)).rejects.toMatchObject({
+      name: "RepoError",
+      code: "INVALID_USER_ID",
+      message: "Invalid userId format",
+    });
   });
 
   it("unsafe userId throws for spaces", async () => {
@@ -217,7 +230,24 @@ describe("JsonPolicyStateRepository", () => {
       summary: "Risk summary",
     };
 
-    await expect(repo.upsertRiskProfile("bad user", risk)).rejects.toThrow("Invalid userId format");
+    await expect(repo.upsertRiskProfile("bad user", risk)).rejects.toMatchObject({
+      name: "RepoError",
+      code: "INVALID_USER_ID",
+      message: "Invalid userId format",
+    });
+  });
+
+  it("invalid userId throws RepoError", async () => {
+    const repo = new JsonPolicyStateRepository();
+    const ips: IpsInstance = {
+      ipsVersion: "v1",
+      ipsSha256: "abc123",
+      status: "DRAFT",
+      createdAtIso: "2026-02-11T00:00:00.000Z",
+      content: "IPS content",
+    };
+
+    await expect(repo.upsertIps("bad/user", ips)).rejects.toBeInstanceOf(RepoError);
   });
 
   it("deterministic write formatting creates parseable json", async () => {

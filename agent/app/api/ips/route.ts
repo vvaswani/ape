@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { JsonPolicyStateRepository } from "@/lib/policy/JsonPolicyStateRepository";
+import { isRepoError } from "@/lib/policy/errors";
 import type { PolicyStateRepository } from "@/lib/policy/PolicyStateRepository";
 import type { IpsDraftUpsertInput } from "@/lib/policy/types";
 import { LocalUserContextProvider } from "@/lib/user/LocalUserContextProvider";
@@ -83,8 +84,10 @@ function validateIpsDraftPayload(body: unknown): ValidationResult {
 }
 
 function mapUnexpectedError(err: unknown): NextResponse<ApiErrorBody> {
-  if (err instanceof Error && err.message.includes("Invalid userId format")) {
-    return errorResponse(400, "BAD_REQUEST", "Invalid user identifier.");
+  if (isRepoError(err)) {
+    if (err.code === "INVALID_USER_ID") {
+      return errorResponse(400, "BAD_REQUEST", "Invalid user identifier.", { reason: err.code });
+    }
   }
 
   return errorResponse(500, "INTERNAL", "Internal error");

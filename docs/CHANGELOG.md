@@ -8,6 +8,16 @@
 
 ---
 
+## 2026-02-28 — Iteration APE-61 (API Error Semantics Hardening)
+### Changed
+- API routes now map known repository failures using typed error codes rather than parsing error message substrings.
+- Invalid user identifier failures are returned deterministically as `400` with `error.code = "BAD_REQUEST"` and `error.details.reason = "INVALID_USER_ID"`.
+
+### Manual regression checks (quick)
+- [ ] `POST /api/ips` with an invalid user context identifier returns `400` with `error.details.reason = "INVALID_USER_ID"`.
+- [ ] `POST /api/ips/freeze` with an invalid user context identifier returns `400` with `error.details.reason = "INVALID_USER_ID"`.
+- [ ] Unexpected internal repository errors still return `500` with a generic message and no stack details.
+
 ## 2026-02-22 — Iteration APE-60 (IPS Draft DTO Contract Hardening)
 ### Changed
 - `POST /api/ips` now accepts a draft DTO with `content` and optional `ipsVersion` instead of the persistence-shaped IPS payload.
