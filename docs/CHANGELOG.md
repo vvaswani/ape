@@ -8,6 +8,19 @@
 
 ---
 
+## 2026-03-01 — Iteration APE-58 (Service-First Slice Completion Evidence)
+### Changed:
+- `POST /api/ips` supports saving an IPS draft for the current user.
+- `POST /api/ips/freeze` freezes the current user’s IPS with idempotent `200` semantics when already frozen and `409` when no IPS exists.
+- Dashboard lifecycle progression now reflects persisted IPS state: `NO_IPS -> IPS_DRAFT -> RISK_PROFILE_MISSING`.
+- `/setup/ips` provides a minimal UI to save draft and freeze, and shows API status/payload responses plainly.
+
+### Manual regression checks (quick):
+- Use `/setup/ips` to save draft and confirm `200` response is shown, then `/dashboard` shows `IPS_DRAFT`.
+- Use `/setup/ips` to freeze and confirm `200` response is shown, then `/dashboard` shows `RISK_PROFILE_MISSING`.
+- Trigger freeze with no persisted IPS and confirm `409` is shown plainly (state reset may be required before this check).
+- Send `POST /api/ips` with unknown fields and confirm `400` with `error.details.unknownFields`.
+
 ## 2026-02-28 — Iteration APE-61 (API Error Semantics Hardening)
 ### Changed
 - API routes now map known repository failures using typed error codes rather than parsing error message substrings.
