@@ -38,6 +38,10 @@ function createPolicyRepo(overrides: Partial<PolicyStateRepository> = {}): Polic
   };
 }
 
+function expectExactKeys(value: Record<string, unknown>, keys: string[]): void {
+  expect(Object.keys(value).sort()).toEqual([...keys].sort());
+}
+
 describe("POST /api/ips/freeze", () => {
   it("freezes a draft IPS for the current user", async () => {
     const draftIps = createIps({ status: "DRAFT" });
@@ -288,5 +292,118 @@ describe("POST /api/ips/freeze", () => {
       },
     });
     expect(policyRepo.upsertIps).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/ips/freeze contract", () => {
+  it("returns 200 with only the stable success envelope when draft is frozen", async () => {
+    const draftIps = createIps({ status: "DRAFT" });
+    const handler = createPostHandler({
+      userProvider: createUserProvider("u123"),
+      policyRepo: createPolicyRepo({
+        getPolicyState: vi.fn(async () => ({
+          userId: "u123",
+          ips: draftIps,
+        })),
+      }),
+    });
+
+    const response = await handler(new Request("http://localhost/api/ips/freeze", { method: "POST" }));
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as Record<string, unknown>;
+    expectExactKeys(body, ["status"]);
+    expect(body).toEqual({ status: "FROZEN" });
+  });
+
+  it("returns 200 with only the stable success envelope when already frozen", async () => {
+    const frozenIps = createIps({ status: "FROZEN" });
+    const handler = createPostHandler({
+      userProvider: createUserProvider("u123"),
+      policyRepo: createPolicyRepo({
+        getPolicyState: vi.fn(async () => ({
+          userId: "u123",
+          ips: frozenIps,
+        })),
+      }),
+    });
+
+    const response = await handler(new Request("http://localhost/api/ips/freeze", { method: "POST" }));
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as Record<string, unknown>;
+    expectExactKeys(body, ["status"]);
+    expect(body).toEqual({ status: "FROZEN" });
+  });
+
+  it("returns 409 conflict envelope when no draft exists", async () => {
+    const handler = createPostHandler({
+      userProvider: createUserProvider("u123"),
+      policyRepo: createPolicyRepo({
+        getPolicyState: vi.fn(async () => null),
+      }),
+    });
+
+    const response = await handler(new Request("http://localhost/api/ips/freeze", { method: "POST" }));
+
+    expect(response.status).toBe(409);
+    const body = (await response.json()) as { error: { code: string; message: string } };
+    expectExactKeys(body, ["error"]);
+    expectExactKeys(body.error as unknown as Record<string, unknown>, ["code", "message"]);
+    expect(body.error.code).toBe("CONFLICT");
+    expect(body.error.message).toBe("No IPS draft exists to freeze.");
+  });
+
+  it("returns 400 malformed-json envelope with code/message", async () => {
+    const handler = createPostHandler({
+      userProvider: createUserProvider("u123"),
+      policyRepo: createPolicyRepo(),
+    });
+
+    const response = await handler(
+      new Request("http://localhost/api/ips/freeze", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{bad-json",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { code: string; message: string } };
+    expectExactKeys(body, ["error"]);
+    expectExactKeys(body.error as unknown as Record<string, unknown>, ["code", "message"]);
+    expect(body.error.code).toBe("BAD_REQUEST");
+    expect(body.error.message).toBe("Request body must be valid JSON.");
+  });
+
+  it("returns 400 validation envelope with unknownFields for unsupported body fields", async () => {
+    const handler = createPostHandler({
+      userProvider: createUserProvider("u123"),
+      policyRepo: createPolicyRepo(),
+    });
+
+    const response = await handler(
+      new Request("http://localhost/api/ips/freeze", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ foo: "bar" }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as {
+      error: {
+        code: string;
+        message: string;
+        details?: { unknownFields?: string[] };
+      };
+    };
+    expectExactKeys(body, ["error"]);
+    expectExactKeys(body.error as unknown as Record<string, unknown>, ["code", "message", "details"]);
+    expect(body.error.code).toBe("BAD_REQUEST");
+    expect(body.error.message).toBe("Request body contains unsupported fields.");
+    expect(body.error.details).toBeDefined();
+    expectExactKeys(body.error.details as unknown as Record<string, unknown>, ["unknownFields"]);
+    expect(body.error.details?.unknownFields).toEqual(["foo"]);
   });
 });

@@ -40,6 +40,10 @@ function createPolicyRepo(overrides: Partial<PolicyStateRepository> = {}): Polic
   };
 }
 
+function expectExactKeys(value: Record<string, unknown>, keys: string[]): void {
+  expect(Object.keys(value).sort()).toEqual([...keys].sort());
+}
+
 describe("POST /api/ips", () => {
   it("saves a valid IPS draft for the current user", async () => {
     const userProvider = createUserProvider("u123");
@@ -357,5 +361,83 @@ describe("POST /api/ips", () => {
       },
     });
     expect(policyRepo.upsertIps).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/ips contract", () => {
+  it("returns 200 with only the stable success envelope", async () => {
+    const handler = createPostHandler({
+      userProvider: createUserProvider("u123"),
+      policyRepo: createPolicyRepo(),
+    });
+
+    const response = await handler(
+      new Request("http://localhost/api/ips", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(createValidDraftRequest()),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as Record<string, unknown>;
+    expectExactKeys(body, ["status"]);
+    expect(body).toEqual({ status: "DRAFT" });
+  });
+
+  it("returns 400 validation envelope with unknownFields for unsupported fields", async () => {
+    const handler = createPostHandler({
+      userProvider: createUserProvider("u123"),
+      policyRepo: createPolicyRepo(),
+    });
+
+    const response = await handler(
+      new Request("http://localhost/api/ips", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...createValidDraftRequest(),
+          foo: "bar",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as {
+      error: {
+        code: string;
+        message: string;
+        details?: { unknownFields?: string[] };
+      };
+    };
+    expectExactKeys(body, ["error"]);
+    expectExactKeys(body.error as unknown as Record<string, unknown>, ["code", "message", "details"]);
+    expect(body.error.code).toBe("BAD_REQUEST");
+    expect(body.error.message).toBe("Request body contains unsupported fields.");
+    expect(body.error.details).toBeDefined();
+    expectExactKeys(body.error.details as unknown as Record<string, unknown>, ["unknownFields"]);
+    expect(body.error.details?.unknownFields).toEqual(["foo"]);
+  });
+
+  it("returns 400 validation envelope with code/message for missing content", async () => {
+    const handler = createPostHandler({
+      userProvider: createUserProvider("u123"),
+      policyRepo: createPolicyRepo(),
+    });
+
+    const response = await handler(
+      new Request("http://localhost/api/ips", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ipsVersion: "v1" }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: { code: string; message: string } };
+    expectExactKeys(body, ["error"]);
+    expectExactKeys(body.error as unknown as Record<string, unknown>, ["code", "message"]);
+    expect(body.error.code).toBe("BAD_REQUEST");
+    expect(body.error.message).toBe("Field 'content' must be a non-empty string.");
   });
 });
