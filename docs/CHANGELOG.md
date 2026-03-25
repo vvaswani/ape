@@ -8,6 +8,19 @@
 
 ---
 
+## 2026-03-24 — Iteration APE-63 (Canonical Non-Chat Decision Boundary)
+### Changed:
+- `/decisions` is now the authoritative decision execution surface, and it submits decision-native requests to `POST /api/decisions`.
+- `request_note` is now narrative-only context; APE no longer derives `portfolio_state` or other decision-driving inputs from freeform note text.
+- `/chat` no longer serves as a runtime entrypoint; it redirects to `/decisions`.
+- `POST /api/chat` no longer executes decisions and now returns `410 Gone` with a pointer to `POST /api/decisions`.
+
+### Manual regression checks (quick):
+- Visit `/dashboard` in `GUIDELINES_COMPILED` state and confirm the CTA goes to `/decisions`.
+- Submit a valid decision request on `/decisions` and confirm a Decision Snapshot is rendered.
+- Submit a note-only decision request and confirm it follows the missing-input safe path instead of inferring portfolio state from prose.
+- Call `POST /api/chat` and confirm it returns `410` with `error.code = "GONE"` and replacement `/api/decisions`.
+
 ## 2026-03-01 — Iteration APE-58 (Service-First Slice Completion Evidence)
 ### Changed:
 - `POST /api/ips` supports saving an IPS draft for the current user.

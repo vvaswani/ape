@@ -94,13 +94,8 @@ const defaultRiskInputs = {
 describe("runDecision", () => {
   it("asks for clarification when portfolio state is missing (scenario 1)", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the current investment policy.\n\nI have not provided my current portfolio weights or cash balances yet.\nPlease proceed according to policy and generate a decision snapshot.",
-        },
-      ],
+      request_note:
+        "Evaluate my portfolio against the current investment policy.\n\nI have not provided my current portfolio weights or cash balances yet.\nPlease proceed according to policy and generate a decision snapshot.",
     });
 
     expect(result.snapshot.recommendation.type).toBe("ASK_CLARIFYING_QUESTIONS");
@@ -135,13 +130,8 @@ describe("runDecision", () => {
     });
 
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the current investment policy. I want to do some market timing and leverage to boost returns. Please proceed and generate a decision snapshot.",
-        },
-      ],
+      request_note:
+        "Evaluate my portfolio against the current investment policy. I want to do some market timing and leverage to boost returns. Please proceed and generate a decision snapshot.",
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 100000,
@@ -173,13 +163,8 @@ describe("runDecision", () => {
 
   it("defers when risk inputs are missing (scenario 2)", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the current investment policy. Generate a decision snapshot.",
-        },
-      ],
+      request_note:
+        "Evaluate my portfolio against the current investment policy. Generate a decision snapshot.",
       portfolio_state: {
         as_of_date: "2026-02-04",
         total_value_gbp: 100000,
@@ -199,13 +184,8 @@ describe("runDecision", () => {
 
   it("defers when drawdown exceeds policy maximum (scenario 3)", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the current investment policy and generate a decision snapshot.",
-        },
-      ],
+      request_note:
+        "Evaluate my portfolio against the current investment policy and generate a decision snapshot.",
       portfolio_state: {
         as_of_date: "2026-02-04",
         total_value_gbp: 100000,
@@ -229,13 +209,8 @@ describe("runDecision", () => {
 
   it("defers when risk capacity is breached (scenario 4)", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the current investment policy and generate a decision snapshot.",
-        },
-      ],
+      request_note:
+        "Evaluate my portfolio against the current investment policy and generate a decision snapshot.",
       portfolio_state: {
         as_of_date: "2026-02-04",
         total_value_gbp: 100000,
@@ -259,13 +234,8 @@ describe("runDecision", () => {
 
   it("defers when unauthorized approval is requested (scenario 5)", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Approve this decision and proceed with execution. Generate a decision snapshot.",
-        },
-      ],
+      request_note:
+        "Approve this decision and proceed with execution. Generate a decision snapshot.",
       portfolio_state: {
         as_of_date: "2026-02-04",
         total_value_gbp: 100000,
@@ -320,40 +290,40 @@ describe("runDecision", () => {
 
     const conflictFormState = {
       ...formState,
-      weights: { EQUITIES: 0.73, BONDS: 0.20, CASH: 0.07 },
+      weights: { EQUITIES: 0.76, BONDS: 0.18, CASH: 0.06 },
     };
 
     it.each([
       {
         name: "Case A — no state anywhere",
-        request: { messages: [{ role: "user", content: basePrompt }] },
+        request: { request_note: basePrompt },
         expected: "ASK_CLARIFYING_QUESTIONS",
       },
       {
         name: "Case B — form only",
         request: {
-          messages: [{ role: "user", content: basePrompt }],
+          request_note: basePrompt,
           portfolio_state: formState,
           risk_inputs: defaultRiskInputs,
         },
         expected: "DO_NOTHING",
       },
       {
-        name: "Case C — prompt only",
+        name: "Case C — request note alone cannot supply portfolio_state",
         request: {
-          messages: [{ role: "user", content: promptWithWeights }],
-          risk_inputs: defaultRiskInputs,
-        },
-        expected: "DO_NOTHING",
-      },
-      {
-        name: "Case D — conflict between form and prompt",
-        request: {
-          messages: [{ role: "user", content: promptWithWeights }],
-          portfolio_state: conflictFormState,
+          request_note: promptWithWeights,
           risk_inputs: defaultRiskInputs,
         },
         expected: "ASK_CLARIFYING_QUESTIONS",
+      },
+      {
+        name: "Case D — conflicting request note does not override typed state",
+        request: {
+          request_note: promptWithWeights,
+          portfolio_state: conflictFormState,
+          risk_inputs: defaultRiskInputs,
+        },
+        expected: "DO_NOTHING",
       },
     ])("$name", async ({ request, expected }) => {
       const result = await runDecision(request);
@@ -363,13 +333,8 @@ describe("runDecision", () => {
 
   it("scenario 2 (in-band, no cash flows) returns RECOMMEND_NO_ACTION", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the current investment policy. Portfolio state: As of date 2026-02-07. Total value: £100,000. Weights: EQUITIES 80%, BONDS 15%, CASH 5%. No new contributions. No new withdrawals. Generate a decision snapshot and recommendation.",
-        },
-      ],
+      request_note:
+        "Evaluate my portfolio against the current investment policy. Portfolio state: As of date 2026-02-07. Total value: £100,000. Weights: EQUITIES 80%, BONDS 15%, CASH 5%. No new contributions. No new withdrawals. Generate a decision snapshot and recommendation.",
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 100000,
@@ -390,13 +355,8 @@ describe("runDecision", () => {
 
   it("policy provenance includes DPQ ids on an in-band, no-cash-flows decision", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the current investment policy and include policy provenance. Portfolio state: As of date 2026-02-07. Total value: £200,000. Weights: EQUITIES 80%, BONDS 15%, CASH 5%. No new contributions. No new withdrawals. Return a decision snapshot with referenced policy items.",
-        },
-      ],
+      request_note:
+        "Evaluate my portfolio against the current investment policy and include policy provenance. Portfolio state: As of date 2026-02-07. Total value: £200,000. Weights: EQUITIES 80%, BONDS 15%, CASH 5%. No new contributions. No new withdrawals. Return a decision snapshot with referenced policy items.",
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 200000,
@@ -418,13 +378,8 @@ describe("runDecision", () => {
 
   it("in-band, no-cash-flows returns DO_NOTHING with computed drift", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the current investment policy. Portfolio state: Total value: £100,000. Asset allocation: Equities 80%, Bonds 15%, Cash 5%. No new contributions. No new withdrawals. Generate a decision snapshot and recommendation.",
-        },
-      ],
+      request_note:
+        "Evaluate my portfolio against the current investment policy. Portfolio state: Total value: £100,000. Asset allocation: Equities 80%, Bonds 15%, Cash 5%. No new contributions. No new withdrawals. Generate a decision snapshot and recommendation.",
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 100000,
@@ -444,13 +399,8 @@ describe("runDecision", () => {
 
   it("out-of-band overweight returns REBALANCE with bands breached", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the current investment policy. Portfolio state: Total value £100,000. Asset allocation: Equities 88%, Bonds 8%, Cash 4%. No new contributions. No new withdrawals. Generate a decision snapshot and recommendation.",
-        },
-      ],
+      request_note:
+        "Evaluate my portfolio against the current investment policy. Portfolio state: Total value £100,000. Asset allocation: Equities 88%, Bonds 8%, Cash 4%. No new contributions. No new withdrawals. Generate a decision snapshot and recommendation.",
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 100000,
@@ -470,13 +420,17 @@ describe("runDecision", () => {
 
   it("recommends rebalance when drift is out of band and no cash flows (scenario 3)", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the current investment policy.\n\nPortfolio state:\n- Total value: £100,000\n- Asset allocation:\n  - Equities: 55%\n  - Bonds: 35%\n  - Cash: 10%\n\nThere are no new contributions or withdrawals planned.\n\nGenerate a decision snapshot and recommendation.",
+      request_note:
+        "Evaluate my portfolio against the current investment policy.\n\nPortfolio state:\n- Total value: £100,000\n- Asset allocation:\n  - Equities: 55%\n  - Bonds: 35%\n  - Cash: 10%\n\nThere are no new contributions or withdrawals planned.\n\nGenerate a decision snapshot and recommendation.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.55, BONDS: 0.35, CASH: 0.1 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
         },
-      ],
+      },
       risk_inputs: defaultRiskInputs,
     });
 
@@ -485,13 +439,8 @@ describe("runDecision", () => {
 
   it("recommends rebalancing via contributions when drift is out of band with contributions (scenario 4)", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the current investment policy using the provided portfolio_state. Generate a decision snapshot and recommendation.",
-        },
-      ],
+      request_note:
+        "Evaluate my portfolio against the current investment policy using the provided portfolio_state. Generate a decision snapshot and recommendation.",
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 100000,
@@ -512,13 +461,8 @@ describe("runDecision", () => {
 
   it("overrides temptation to act when drift is in band with no cash flows (scenario 5)", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the current investment policy using the provided portfolio_state. If action is not justified by policy, explicitly recommend inaction. Generate a decision snapshot.",
-        },
-      ],
+      request_note:
+        "Evaluate my portfolio against the current investment policy using the provided portfolio_state. If action is not justified by policy, explicitly recommend inaction. Generate a decision snapshot.",
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 100000,
@@ -538,39 +482,51 @@ describe("runDecision", () => {
 
   it("recommends rebalancing via contributions when in-band with contributions (3c prompt C)", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate against policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. Planned contribution: £2,000.",
+      request_note:
+        "Evaluate against policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. Planned contribution: £2,000.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 2000,
+          pending_withdrawals_gbp: 0,
         },
-      ],
+      },
       risk_inputs: defaultRiskInputs,
     });
 
     expect(result.snapshot.recommendation.type).toBe("REBALANCE_VIA_CONTRIBUTIONS");
   });
 
-  it("keeps DO_NOTHING regardless of prompt tone (prompt invariance)", async () => {
+  it("keeps DO_NOTHING regardless of request note tone when typed inputs are the same", async () => {
     const neutral = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      request_note:
+        "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
         },
-      ],
+      },
       risk_inputs: defaultRiskInputs,
     });
 
     const emotional = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Please, I am really worried and want action. Evaluate my portfolio: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      request_note:
+        "Please, I am really worried and want action. Evaluate my portfolio: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
         },
-      ],
+      },
       risk_inputs: defaultRiskInputs,
     });
 
@@ -595,13 +551,17 @@ describe("runDecision", () => {
     });
 
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      request_note:
+        "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
         },
-      ],
+      },
       risk_inputs: defaultRiskInputs,
     });
 
@@ -624,13 +584,17 @@ describe("runDecision", () => {
     });
 
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      request_note:
+        "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
         },
-      ],
+      },
       risk_inputs: defaultRiskInputs,
     });
 
@@ -641,13 +605,17 @@ describe("runDecision", () => {
     forcedResponse = "not-json";
 
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      request_note:
+        "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
         },
-      ],
+      },
       risk_inputs: defaultRiskInputs,
     });
 
@@ -672,13 +640,17 @@ describe("runDecision", () => {
     });
 
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate against policy. Portfolio state: Equities 90%, Bonds 8%, Cash 2%. No new cash flows.",
+      request_note:
+        "Evaluate against policy. Portfolio state: Equities 90%, Bonds 8%, Cash 2%. No new cash flows.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.9, BONDS: 0.08, CASH: 0.02 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
         },
-      ],
+      },
       risk_inputs: defaultRiskInputs,
     });
 
@@ -702,13 +674,17 @@ describe("runDecision", () => {
     });
 
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content:
-            "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      request_note:
+        "Evaluate my portfolio against the policy. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No new contributions or withdrawals.",
+      portfolio_state: {
+        as_of_date: "2026-02-07",
+        total_value_gbp: 100000,
+        weights: { EQUITIES: 0.78, BONDS: 0.16, CASH: 0.06 },
+        cash_flows: {
+          pending_contributions_gbp: 0,
+          pending_withdrawals_gbp: 0,
         },
-      ],
+      },
       risk_inputs: defaultRiskInputs,
     });
 

@@ -1,7 +1,7 @@
 # Architecture Overview
 
 ## Purpose
-- Provide policy-driven portfolio decision support for a human investor through a conversational UI and a deterministic Decision Snapshot.
+- Provide policy-driven portfolio decision support for a human investor through a lifecycle-driven UI and a deterministic Decision Snapshot.
 - Convert user context and portfolio state into a governed recommendation that is auditable and reviewable.
 - Enforce policy constraints and safe fallbacks before any recommendation is surfaced.
 
@@ -25,8 +25,8 @@
 ## High-level Components
 > Describe responsibility boundaries, not code structure.
 
-- **UI / Client:** Dashboard-first lifecycle routing is the primary UX; chat remains available for governed decision support and treats Decision Snapshot as authoritative output.
-- **API / Service layer:** `POST /api/chat` validates request shape, orchestrates decision flow, applies guardrails, and emits snapshot.
+- **UI / Client:** Dashboard-first lifecycle routing is the primary UX; `/decisions` is the authoritative decision trigger surface and renders the Decision Snapshot as the authoritative output.
+- **API / Service layer:** `POST /api/decisions` validates decision-native request shape, orchestrates decision flow, applies guardrails, and emits snapshot. Typed fields are authoritative for decision execution; `request_note` is narrative only.
 - **User context (platform):** User identity is resolved only via `UserContextProvider`; domain/business logic must be user-scoped and must not read env/auth inputs directly.
 - **Policy state repository (platform/data):** User-scoped policy lifecycle artifacts are persisted behind `PolicyStateRepository` (MVP `JsonPolicyStateRepository`) with storage root configured by `POLICY_STATE_DIR`.
 - **Data store(s):** Policy is version-controlled in `artifacts/policy/default/*` (with optional local authoring overrides in `artifacts/local/*`) as the authoring source of truth; no DB through Milestone 3c. Production runtime must consume the immutable, release-baked governance bundle (policy JSON + Prime Directive markdown) via `POLICY_DIR` (for example, `/app/policy`) and must not read repo artifacts as runtime dependencies. User policy lifecycle state remains versioned/data-scoped and persisted via `PolicyStateRepository`.
@@ -34,7 +34,7 @@
 - **Jobs / schedulers (if any):** None in current scope.
 
 ## Data Model (at a glance)
-- Core entities: `ChatRequest`, `PortfolioStateInput`, `PolicyJson`, `DecisionSnapshot`.
+- Core entities: `DecisionRequest`, `PortfolioStateInput`, `PolicyJson`, `DecisionSnapshot`.
 - Key identifiers: `snapshot_id`, `policy_id`, `policy_version`.
 - Ownership / source of truth: deterministic evaluation fields owned by service logic + runtime governance bundle (from `POLICY_DIR`, authored in artifacts); recommendation/explanation text proposed by model then constrained by guardrails.
 - Retention / archival assumptions: snapshots are returned per request only; policy lifecycle state persists as user-scoped repository records.
@@ -105,8 +105,8 @@ This mirrors orthodox advisory practice:
 NOTE: Do not duplicate this content in other docs. ARCHITECTURE is authoritative.
 
 ### Flow A — Governed decision with structured state
-1. UI sends chat history plus optional structured `portfolio_state` to `POST /api/chat`.
-2. Service loads policy, validates/coerces state (with safe fallback path), computes deterministic drift/risk context.
+1. UI sends a decision request plus optional structured `portfolio_state` to `POST /api/decisions`.
+2. Service loads policy, validates typed inputs (with safe fallback path), computes deterministic drift/risk context, and does not derive decision-driving inputs from freeform note text.
 3. LLM proposes recommendation/explanation JSON; guardrails + explanation contract enforce policy and snapshot is returned.
 
 ### Flow B — Missing or invalid state safety path
@@ -128,6 +128,7 @@ NOTE: Do not duplicate this content in other docs. ARCHITECTURE is authoritative
 - If portfolio_state exists, the system must never request weights.
 - When `portfolio_state.weights` are provided, values are decimals (0-1); incomplete/missing weights must trigger a safe path rather than 500.
 - Expected validation/model failures must return safe snapshot outcomes and should not surface as HTTP 500.
+- `request_note` may contribute narrative context only; it must never populate, override, or reconcile `portfolio_state`.
 
 ## Observability (minimum)
 - Logs: server logs for policy provenance, fallback reasons, guardrail/explanation warnings; client debug logging gated by log level.
@@ -141,19 +142,20 @@ NOTE: Do not duplicate this content in other docs. ARCHITECTURE is authoritative
 - Data sensitivity notes: portfolio inputs are user-provided financial context; avoid logging secrets and keep policy bundles local by default in dev while production uses a release-baked bundle.
 
 ## External Interfaces
-- Public endpoints: `POST /api/chat`.
+- Public endpoints: `POST /api/decisions`.
 - Webhooks / inbound: none.
 - File formats / CSV contracts: JSON policy artifacts and markdown governance contracts in `artifacts/`.
 
 ## Decision Entry Points (Authoritative)
 - This section is the single source of truth for current decision trigger paths in the repo.
-- Current decision execution entrypoint (as implemented today):
-  - `POST /api/chat` -> `agent/app/api/chat/route.ts` (`POST`) -> `agent/lib/services/decisionService.ts` (`runDecision(...)`)
-  - Current UI caller to that route (non-authoritative): `agent/app/chat/page.tsx` -> `agent/components/ChatPage.tsx` (`fetch("/api/chat")`)
-- `POST /api/chat` remains a temporary route into the decision service, but Milestone scenario proofs use the canonical decision boundary via the test harness (`runDecision(...)`).
+- Current decision execution entrypoint:
+  - `agent/app/dashboard/page.tsx` CTA -> `agent/app/decisions/page.tsx` -> `agent/components/DecisionRunner.tsx` (`fetch("/api/decisions")`)
+  - `POST /api/decisions` -> `agent/app/api/decisions/route.ts` (`POST`) -> `agent/lib/services/decisionService.ts` (`runDecision(...)`)
+- `POST /api/chat` is retired as an execution entrypoint and returns `410 Gone` with a pointer to `POST /api/decisions`.
 
 ## Governance Inputs at Decision Boundary
 - Decision Boundary (in this repo): the canonical invocation point that mints a Decision Snapshot (test harness / canonical decision entrypoint), not UI surfaces.
+- Decision requests are typed-input authoritative: `portfolio_state`, `risk_inputs`, and `authority` are the only decision-driving inputs. `request_note` is narrative context only.
 - Mode A (Allowed today) - Boundary-supplied:
   - Observed governance inputs at the boundary (request payload / invocation args source of truth): `risk_inputs`, `risk_inputs.rolling_12m_drawdown_pct`, `risk_inputs.risk_capacity_breached`, `authority`, `authority.actor_role`, `authority.decision_intent`.
   - Current implementation records supplied governance inputs in snapshot `inputs_observed[]` entries with `source: "request"`.
@@ -168,9 +170,9 @@ NOTE: Do not duplicate this content in other docs. ARCHITECTURE is authoritative
   - If governance inputs are absent, snapshot MUST record missing inputs explicitly; current implementation supports explicit missing-input recording via `inputs_missing[]`.
   - Missing governance inputs are recorded explicitly via `inputs_provenance.<field> = "missing"`, and snapshots may also include `inputs_missing[]` entries listing missing fields.
 - Positioning:
-  - Phase A proofs run via canonical decision boundary (test harness).
-  - `/api/chat`, if present, is legacy and non-authoritative and may be removed.
-- `agent/app/dashboard/page.tsx`, `agent/app/setup/ips/page.tsx`, `agent/app/setup/risk-profile/page.tsx`, `agent/app/setup/guidelines/page.tsx`, and `agent/app/decisions/page.tsx` are currently UI routes (lifecycle-driven) and do not trigger the decision pipeline yet.
+  - Product runtime uses the same canonical decision boundary as tests: `POST /api/decisions` -> `runDecision(...)`.
+  - `/api/chat` is legacy and non-executing; `/chat` redirects to `/decisions`.
+- `agent/app/dashboard/page.tsx` is the control plane for lifecycle routing, and `agent/app/decisions/page.tsx` is now the authoritative UI trigger for decision execution.
 
 ## Links
 - Decision log: `docs/decisions/`

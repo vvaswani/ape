@@ -16,7 +16,7 @@
 
 import crypto from "node:crypto";
 
-import type { ChatRequest } from "@/lib/domain/chat";
+import type { DecisionRequest } from "@/lib/domain/decision";
 import type {
   DecisionSnapshot,
   OutcomeState,
@@ -40,7 +40,6 @@ import {
 } from "@/lib/services/guardrails";
 
 const SNAPSHOT_VERSION = "0.3";
-const EPS = 1e-6;
 
 const DPQ_AUTHORITY = "DPQ-001";
 const DPQ_DRIFT = "DPQ-002";
@@ -69,94 +68,13 @@ function findPolicyItem(dpqId: string): PolicyItemReference | null {
   return match ?? null;
 }
 
-function extractLastUserMessage(messages: ChatRequest["messages"]): string | null {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    if (messages[i]?.role === "user" && typeof messages[i]?.content === "string") {
-      return messages[i].content;
-    }
-  }
-  return null;
-}
-
-function parseNumber(raw: string): number | null {
-  const cleaned = raw.replace(/,/g, "").trim();
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
-
-function parseWeight(value: number, hasPercent: boolean): number {
-  if (hasPercent || value > 1) {
-    return value / 100;
-  }
-  return value;
-}
-
-function extractPortfolioStateFromPrompt(content: string): PortfolioStateInput | null {
-  const eqMatch = /equities[^0-9]*([0-9]+(?:\.[0-9]+)?)\s*(%?)/i.exec(content);
-  const bdMatch = /bonds?[^0-9]*([0-9]+(?:\.[0-9]+)?)\s*(%?)/i.exec(content);
-  const csMatch = /cash[^0-9]*([0-9]+(?:\.[0-9]+)?)\s*(%?)/i.exec(content);
-
-  if (!eqMatch || !bdMatch || !csMatch) {
+function extractDecisionNote(requestNote: DecisionRequest["request_note"]): string | null {
+  if (typeof requestNote !== "string") {
     return null;
   }
 
-  const eqRaw = parseNumber(eqMatch[1]);
-  const bdRaw = parseNumber(bdMatch[1]);
-  const csRaw = parseNumber(csMatch[1]);
-  if (eqRaw === null || bdRaw === null || csRaw === null) {
-    return null;
-  }
-
-  const weights = {
-    EQUITIES: parseWeight(eqRaw, eqMatch[2] === "%"),
-    BONDS: parseWeight(bdRaw, bdMatch[2] === "%"),
-    CASH: parseWeight(csRaw, csMatch[2] === "%"),
-  };
-
-  const totalMatch = /total\s*value[^0-9]*([0-9,]+(?:\.[0-9]+)?)/i.exec(content);
-  const total_value_gbp = totalMatch ? parseNumber(totalMatch[1]) : null;
-
-  let pending_contributions_gbp: number | null = null;
-  let pending_withdrawals_gbp: number | null = null;
-  if (/no\s+new\s+contributions?/i.test(content)) {
-    pending_contributions_gbp = 0;
-  } else {
-    const contribMatch = /contributions?[^0-9]*([0-9,]+(?:\.[0-9]+)?)/i.exec(content);
-    if (contribMatch) pending_contributions_gbp = parseNumber(contribMatch[1]);
-  }
-  if (/no\s+new\s+withdrawals?/i.test(content)) {
-    pending_withdrawals_gbp = 0;
-  } else {
-    const wdMatch = /withdrawals?[^0-9]*([0-9,]+(?:\.[0-9]+)?)/i.exec(content);
-    if (wdMatch) pending_withdrawals_gbp = parseNumber(wdMatch[1]);
-  }
-
-  return {
-    as_of_date: new Date().toISOString().slice(0, 10),
-    total_value_gbp,
-    weights,
-    cash_flows: {
-      pending_contributions_gbp,
-      pending_withdrawals_gbp,
-    },
-  };
-}
-
-function statesDiffer(a: PortfolioStateInput, b: PortfolioStateInput): boolean {
-  const diffWeight =
-    Math.abs((a.weights.EQUITIES ?? 0) - (b.weights.EQUITIES ?? 0)) > EPS ||
-    Math.abs((a.weights.BONDS ?? 0) - (b.weights.BONDS ?? 0)) > EPS ||
-    Math.abs((a.weights.CASH ?? 0) - (b.weights.CASH ?? 0)) > EPS;
-
-  const diffTotal = (a.total_value_gbp ?? null) !== (b.total_value_gbp ?? null);
-  const diffContrib =
-    (a.cash_flows.pending_contributions_gbp ?? null) !==
-    (b.cash_flows.pending_contributions_gbp ?? null);
-  const diffWd =
-    (a.cash_flows.pending_withdrawals_gbp ?? null) !==
-    (b.cash_flows.pending_withdrawals_gbp ?? null);
-
-  return diffWeight || diffTotal || diffContrib || diffWd;
+  const trimmed = requestNote.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 function isEmptyState(state: PortfolioStateInput): boolean {
@@ -408,11 +326,11 @@ function buildCorrectnessEvaluation(args: {
 /**
  * Main entry point for decision generation.
  */
-export async function runDecision(req: ChatRequest): Promise<{ snapshot: DecisionSnapshot }> {
+export async function runDecision(req: DecisionRequest): Promise<{ snapshot: DecisionSnapshot }> {
   const snapshotId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
 
-  if (!Array.isArray(req.messages)) {
+  if (req.request_note !== undefined && typeof req.request_note !== "string") {
     const errorSnapshot: DecisionSnapshot = {
       snapshot_id: snapshotId,
       snapshot_version: SNAPSHOT_VERSION,
@@ -434,8 +352,8 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
       errors: [
         {
           code: "INVALID_REQUEST",
-          message: "messages must be an array",
-          fields: ["messages"],
+          message: "request_note must be a string when provided",
+          fields: ["request_note"],
         },
       ],
       context: {
@@ -516,7 +434,7 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
         },
       },
       explanation: {
-        decision_summary: "Invalid request; missing messages array.",
+        decision_summary: "Invalid request; request_note must be a string when provided.",
         relevant_portfolio_state: "No portfolio state.",
         policy_basis: "Policy unavailable due to invalid request.",
         reasoning_and_tradeoffs: "Cannot evaluate without a valid request payload.",
@@ -555,11 +473,10 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
 
   /**
    * ------------------------------------------------------------------
-   * Structured + prompt-derived portfolio state (optional)
+   * Typed decision inputs (authoritative)
    * ------------------------------------------------------------------
    */
-  const lastUserMessage = extractLastUserMessage(req.messages);
-  const parsedState = lastUserMessage ? extractPortfolioStateFromPrompt(lastUserMessage) : null;
+  const requestNote = extractDecisionNote(req.request_note);
   const hasPortfolioStateProvided =
     !!req.portfolio_state && !isEmptyState(req.portfolio_state);
   const structuredState =
@@ -574,23 +491,7 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
     console.log("[APE] Form state empty or incomplete:", describeFormState(req.portfolio_state));
   }
 
-  const hasConflict =
-    !!parsedState && !!structuredState && statesDiffer(parsedState, structuredState);
-  if (hasConflict) {
-    const warning =
-      "Prompt portfolio state conflicts with the form values. Please confirm the correct inputs.";
-    auditWarnings.push(warning);
-    console.warn("[APE] Prompt/form conflict:", warning);
-  } else if (parsedState && !req.portfolio_state) {
-    const warning = "Using prompt-derived portfolio state.";
-    auditWarnings.push(warning);
-    console.log("[APE] Prompt-derived state:", warning);
-  }
-
-  // If there's a conflict, treat the state as missing to force clarification.
-  const state: PortfolioStateInput | null = hasConflict
-    ? null
-    : structuredState ?? parsedState ?? null;
+  const state: PortfolioStateInput | null = structuredState;
 
   const authority: AuthorityContext = req.authority ?? {
     actor_role: "USER",
@@ -611,11 +512,9 @@ export async function runDecision(req: ChatRequest): Promise<{ snapshot: Decisio
   const hasCashFlows = (pendingContrib ?? 0) > 0 || (pendingWithdraw ?? 0) > 0;
 
   const baseRecommendationType: RecommendationType = !state
-    ? hasConflict
-      ? "ASK_CLARIFYING_QUESTIONS"
-      : hasPortfolioStateProvided
-        ? "DEFER_AND_REVIEW"
-        : "ASK_CLARIFYING_QUESTIONS"
+    ? hasPortfolioStateProvided
+      ? "DEFER_AND_REVIEW"
+      : "ASK_CLARIFYING_QUESTIONS"
     : !driftResult
       ? "DEFER_AND_REVIEW"
       : hasCashFlows
@@ -737,7 +636,7 @@ Portfolio state has NOT been provided.
    * ------------------------------------------------------------------
    */
   const rawResponse = await generateAssistantReply({
-    messages: req.messages,
+    messages: requestNote ? [{ role: "user", content: requestNote }] : [],
     systemPrompt: prompt,
   });
 
@@ -1002,15 +901,9 @@ Portfolio state has NOT been provided.
   const inputsObserved = [
     ...(state
       ? [
-          { input_key: "portfolio_state.weights", value: "provided", source: "form" as const },
-          { input_key: "portfolio_state.cash_flows", value: "provided", source: "form" as const },
-          { input_key: "portfolio_state.total_value", value: state.total_value_gbp, source: "form" as const },
-        ]
-      : []),
-    ...(parsedState && !state
-      ? [
-          { input_key: "portfolio_state.weights", value: "provided", source: "prompt" as const },
-          { input_key: "portfolio_state.cash_flows", value: "provided", source: "prompt" as const },
+          { input_key: "portfolio_state.weights", value: "provided", source: "request" as const },
+          { input_key: "portfolio_state.cash_flows", value: "provided", source: "request" as const },
+          { input_key: "portfolio_state.total_value", value: state.total_value_gbp, source: "request" as const },
         ]
       : []),
     ...(riskInputs
@@ -1136,7 +1029,7 @@ Portfolio state has NOT been provided.
       },
       market_context: {
         as_of_date: state?.as_of_date ?? new Date().toISOString().slice(0, 10),
-        notes: "No exceptional market context assumed.",
+        notes: requestNote ?? "No exceptional market context assumed.",
       },
     },
 

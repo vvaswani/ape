@@ -79,6 +79,18 @@ Then browse to:
 
 ### Tests (Local)
 
+Supported test entrypoints for this repo use npm scripts from `agent/`.
+Use these commands for local work and automation:
+
+```bash
+cd agent
+npm test
+npm run test:coverage
+```
+
+Direct PowerShell invocation such as `npx vitest run` is not part of the supported repo contract.
+In this environment it may fail before test startup with `spawn EPERM`, even when the npm-script path works.
+
 From the repo root, run coverage with `cd agent && npm run test:coverage`.
 Type-only file guardrail (local): `cd agent && npm run check:types-type-only`.
 

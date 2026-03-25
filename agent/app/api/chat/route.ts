@@ -1,41 +1,33 @@
-/**
- * @file route.ts
- * @description
- * HTTP API route for Decision requests.
- *
- * This route must remain thin:
- * - Parse JSON
- * - Call service
- * - Return JSON
- */
-
 import { NextResponse } from "next/server";
-import type { ChatRequest } from "@/lib/domain/chat";
-import { runDecision } from "@/lib/services/decisionService";
 
-export async function POST(req: Request) {
-  try {
-    const body = (await req.json()) as ChatRequest;
+type ApiErrorBody = {
+  error: {
+    code: "GONE";
+    message: string;
+    details: {
+      replacement: "/api/decisions";
+    };
+  };
+};
 
-    // 🔒 Enforce correct request shape
-    if (!Array.isArray(body.messages)) {
-      throw new Error("Invalid request: messages must be an array");
-    }
+export function createPostHandler() {
+  return async function POST(req: Request) {
+    void req;
 
-    const result = await runDecision({
-      messages: body.messages,
-      portfolio_state: body.portfolio_state,
-      risk_inputs: body.risk_inputs,
-      authority: body.authority,
-    });
-
-    return NextResponse.json(result);
-  } catch (err) {
-    console.error("Decision API error:", err);
-    return NextResponse.json(
-      { error: "failed to generate decision" },
-      { status: 500 }
+    return NextResponse.json<ApiErrorBody>(
+      {
+        error: {
+          code: "GONE",
+          message: "POST /api/chat no longer executes decisions. Use POST /api/decisions.",
+          details: {
+            replacement: "/api/decisions",
+          },
+        },
+      },
+      { status: 410 },
     );
-  }
+  };
 }
+
+export const POST = createPostHandler();
 

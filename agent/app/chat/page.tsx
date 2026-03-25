@@ -1,5 +1,5 @@
-import ChatPage from "@/components/ChatPage";
+import { redirect } from "next/navigation";
 
 export default function ChatRoutePage() {
-  return <ChatPage />;
+  redirect("/decisions");
 }

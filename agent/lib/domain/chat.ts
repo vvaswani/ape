@@ -1,16 +1,8 @@
 /**
  * @file chat.ts
  * @description
- * Domain types for the AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator) chat protocol.
- *
- * This file defines the canonical request/response shapes used between UI and API.
- * Keeping these in one place prevents "UI shapes the protocol" drift.
+ * Lightweight conversational message types used only inside the LLM adapter layer.
  */
-
-import type { AuthorityContext } from "@/lib/domain/authority";
-import type { DecisionSnapshot } from "@/lib/domain/decisionSnapshot";
-import type { PortfolioStateInput } from "@/lib/domain/portfolioState";
-import type { RiskInputs } from "@/lib/domain/riskInputs";
 
 /**
  * A supported chat role for multi-turn conversation.
@@ -32,39 +24,3 @@ export interface ChatMessage {
   content: string;
 }
 
-/**
- * Request payload sent by the UI to the API.
- */
-export interface ChatRequest {
-  /**
-   * Full conversation history, in order.
-   * The service may apply truncation or limits as needed.
-   */
-  messages: ChatMessage[];
-
-  /**
-   * Optional structured portfolio snapshot provided by the user.
-   * If present, it becomes authoritative factual input for drift computation.
-   */
-  portfolio_state?: PortfolioStateInput;
-
-  /**
-   * Optional structured risk inputs used for deterministic guardrail checks.
-   */
-  risk_inputs?: RiskInputs;
-
-  /**
-   * Optional authority context for approval/execution boundary enforcement.
-   */
-  authority?: AuthorityContext;
-}
-
-/**
- * Response payload returned by the API to the UI.
- */
-export interface ChatResponse {
-  /**
-   * Deterministic snapshot returned by the decision service.
-   */
-  snapshot: DecisionSnapshot;
-}

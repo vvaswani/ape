@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import DecisionRunner from "@/components/DecisionRunner";
 import { loadDashboardLifecycle } from "@/lib/dashboard/loadDashboardLifecycle";
 import { canAccessDecisions, getRedirectForLifecycle } from "@/lib/guards/lifecycleGuards";
 
@@ -10,11 +11,6 @@ export default async function DecisionsPage() {
     redirect(getRedirectForLifecycle(lifecycleState));
   }
 
-  return (
-    <main>
-      <h1>Decisions</h1>
-      <p>Not implemented.</p>
-    </main>
-  );
+  return <DecisionRunner />;
 }
 

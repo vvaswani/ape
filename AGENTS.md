@@ -12,6 +12,8 @@
 - Before editing, inspect existing patterns in the repo (route handlers, error responses, tests, dependency injection style) and follow them unless the story requires a new pattern.
 - Run targeted tests for the changed scope first.
 - Run the repo-standard full test command before final handoff when feasible.
+- Repo-standard local test commands are `cd agent && npm test` and `cd agent && npm run test:coverage`.
+- Treat direct PowerShell Vitest invocation (for example `npx vitest run`) as non-authoritative for this repo if it disagrees with the npm-script path.
 - If tests cannot run, state the exact command attempted, the exact failure, and whether the issue is code-related or environment/setup-related.
 
 ## Error Handling Rule: Third-Route Trigger (Typed Codes)

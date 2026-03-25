@@ -71,12 +71,7 @@ describe("Decision Snapshot contract (M3b)", () => {
 
   it("populates policy_applied and drift evaluation for a full apply pass", async () => {
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content: "Evaluate my portfolio and generate a decision snapshot.",
-        },
-      ],
+      request_note: "Evaluate my portfolio and generate a decision snapshot.",
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 100000,
@@ -112,11 +107,20 @@ describe("Decision Snapshot contract (M3b)", () => {
       risk_inputs: true,
       authority: true,
     });
+    expect(
+      result.snapshot.inputs_observed.filter((item) => item.input_key.startsWith("portfolio_state."))
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ input_key: "portfolio_state.weights", source: "request" }),
+        expect.objectContaining({ input_key: "portfolio_state.cash_flows", source: "request" }),
+        expect.objectContaining({ input_key: "portfolio_state.total_value", source: "request" }),
+      ]),
+    );
   });
 
   it("does not request weights when portfolio_state exists but weights are missing", async () => {
     const result = await runDecision({
-      messages: [{ role: "user", content: "Evaluate my portfolio." }],
+      request_note: "Evaluate my portfolio.",
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 100000,
@@ -136,12 +140,7 @@ describe("Decision Snapshot contract (M3b)", () => {
     mockModelResponse({ ...baseModel, recommendation_type: "REBALANCE" });
 
     const result = await runDecision({
-      messages: [
-        {
-          role: "user",
-          content: "Evaluate my portfolio and generate a decision snapshot.",
-        },
-      ],
+      request_note: "Evaluate my portfolio and generate a decision snapshot.",
       portfolio_state: {
         as_of_date: "2026-02-07",
         total_value_gbp: 100000,
@@ -177,7 +176,8 @@ describe("Decision Snapshot contract (M3b)", () => {
 
   it("marks drift as not_applicable when no portfolio_state is provided", async () => {
     const result = await runDecision({
-      messages: [{ role: "user", content: "Evaluate my portfolio." }],
+      request_note:
+        "Evaluate my portfolio. Portfolio state: Equities 78%, Bonds 16%, Cash 6%. No cash flows.",
     });
 
     expect(result.snapshot.evaluation.drift.status).toBe("not_applicable");
@@ -194,5 +194,8 @@ describe("Decision Snapshot contract (M3b)", () => {
     expect(result.snapshot.inputs_provenance.authority).not.toBeNull();
     expect(typeof result.snapshot.inputs_evaluated.risk_inputs).toBe("boolean");
     expect(typeof result.snapshot.inputs_evaluated.authority).toBe("boolean");
+    expect(
+      result.snapshot.inputs_observed.some((item) => item.input_key.startsWith("portfolio_state."))
+    ).toBe(false);
   });
 });

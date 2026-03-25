@@ -1,6 +1,6 @@
 {
   "entryPoints": [
-    "lib/domain/chat.ts",
+    "lib/domain/decision.ts",
     "lib/domain/decisionSnapshot.ts",
     "lib/domain/portfolioState.ts",
     "lib/domain/riskInputs.ts",
