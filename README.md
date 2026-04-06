@@ -15,14 +15,14 @@ Meet APE — your AI-native portfolio advisor!
 
 ## License
 
-This project is licensed under the **GNU Affero General Public License v3 (AGPLv3)**.
+This project is licensed under the GNU Affero General Public License v3 (AGPLv3).
 
 * You are free to use, modify, and run this software, including in networked/server environments, under the terms of the AGPL.
 * If you modify the software and make it available over a network, you must also make your source code available under the same license.
 
 ### Commercial Licensing
 
-We also offer **commercial licenses** for organizations that wish to:
+We also offer commercial licenses for organizations that wish to:
 
 * Use this software in proprietary systems
 * Avoid AGPL obligations
