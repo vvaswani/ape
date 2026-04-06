@@ -8,11 +8,11 @@ To protect both you and the project, we require all contributors to agree to the
 
 * **"Project"** refers to this repository and all associated code, documentation, and materials.
 * **"Contribution"** means any code, documentation, or other material submitted to the Project.
-* **"Project owners"** refers to the copyright holders of the Project, or any entity they designate.
+* **"Project Owners"** refers to the copyright holders of the Project, or any entity they designate.
 
 ## 2. Grant of Rights
 
-You hereby grant to the **Project owners** a **perpetual, worldwide, non-exclusive, royalty-free, irrevocable license** to:
+You hereby grant to the **Project Owners** a **perpetual, worldwide, non-exclusive, royalty-free, irrevocable license** to:
 
 * Use, reproduce, modify, adapt, publish, and distribute your Contributions
 * Sublicense your Contributions under any license
@@ -22,7 +22,7 @@ You hereby grant to the **Project owners** a **perpetual, worldwide, non-exclusi
 
 You retain ownership of your Contributions.
 
-However, you grant the **Project owners** the rights described above to ensure the Project can be maintained, distributed, and commercially licensed.
+However, you grant the **Project Owners** the rights described above to ensure the Project can be maintained, distributed, and commercially licensed.
 
 ## 4. Original Work
 
@@ -34,11 +34,11 @@ You represent that:
 
 ## 5. No Obligation
 
-The Project owners are not required to accept any Contribution.
+The Project Owners are not required to accept any Contribution.
 
 ## 6. License of Contributions
 
-Unless otherwise agreed in writing, Contributions may be distributed as part of the Project under the Project’s current license (e.g., AGPL) and/or other licenses as determined by the Project owners.
+Unless otherwise agreed in writing, Contributions may be distributed as part of the Project under the Project’s current license (e.g., AGPL) and/or other licenses as determined by the Project Owners.
 
 ## 7. Agreement
 
