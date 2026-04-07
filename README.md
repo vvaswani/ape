@@ -1,149 +1,33 @@
 # A.P.E aka Automated Portfolio Evaluator!
 
-Meet APE - your AI-native portfolio advisor!
+Meet APE — your AI-native portfolio advisor!
 
 ## Start
 
-### Option A: Run with Docker (recommended)
-
-1) Copy the env template and fill in at least one provider key:
-
-```bash
-cp .env.sample .env
-```
-
-- `GOOGLE_GENERATIVE_AI_API_KEY=...`  
-  or `OPENAI_API_KEY=...`  
-  or `ANTHROPIC_API_KEY=...`
-
-
-2) Start the stack:
-
-```bash
-docker compose up --build
-```
-
-> Note: Docker reads local environment variables from `.env` via `docker-compose.yml` (`env_file`).
-> Update `.env` for `LOG_LEVEL` or API keys.
-
-3) Browse to:
-
-* [http://localhost:3000](http://localhost:3000)
-
-#### Tests (Docker)
-
-Run the unit tests inside the container:
-
-```bash
-docker compose exec agent bun run test
-```
-
-Watch mode and coverage:
-
-```bash
-docker compose exec agent bun run test:watch
-docker compose exec agent bun run test:coverage
-```
-
-Note: the container uses a named `node_modules` volume. If tests fail with `vitest: not found`,
-run `docker compose exec agent bun install` once inside the running container.
-
-### Option B: Run the agent app directly (no Docker)
-
-```bash
-cd agent
-npm install
-npm run dev
-```
-
-Then browse to:
-
-* [http://localhost:3000](http://localhost:3000)
-
-> Note: if you run without Docker, ensure your environment variables are available to the `agent` process
-> (e.g., via `agent/.env.local` or your shell environment).
+* `export GOOGLE_GENERATIVE_AI_API_KEY=...` # or `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`
+* `docker compose up`
+* Browse to `http://localhost:3000`
 
 ## Contributing
 
 * This repository follows the Conventional Commits Specification for commits and pull requests.
-* Run unit tests from the `agent/` directory: `npm run test`
-* Branch names are enforced in CI and must follow:
-  * `<type>/APE<id>-<description>` or `<type>/APE-<id>-<description>`
-  * Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `build`, `perf`, `style`, `hotfix`
-  * `<id>` must be 1-3 digits, `<description>` must be lowercase kebab-case
-  * Examples: `feat/APE1-plane-sync`, `chore/APE-11-update-workflow`, `docs/APE-111-add-setup-guide`
-* Plane key required in commit subject for code changes: include `APE-<id>` (e.g., `APE-123`).
-* Example: `feat(agent): APE-123 Enforce explanation contract`
-* Docs-only changes (docs/ or *.md only) do not require a Plane key.
-* See `.husky/commit-msg` for the exact enforcement rule.
+* By submitting a contribution, you agree to the terms of the Contributor License Agreement (CLA). See `CLA.md` for details.
 
-### Tests (Local)
+## License
 
-Supported test entrypoints for this repo use npm scripts from `agent/`.
-Use these commands for local work and automation:
+This project is licensed under the GNU Affero General Public License v3 (AGPLv3).
 
-```bash
-cd agent
-npm test
-npm run test:coverage
-```
+* You are free to use, modify, and run this software, including in networked/server environments, under the terms of the AGPL.
+* If you modify the software and make it available over a network, you must also make your source code available under the same license.
 
-Direct PowerShell invocation such as `npx vitest run` is not part of the supported repo contract.
-In this environment it may fail before test startup with `spawn EPERM`, even when the npm-script path works.
+### Commercial Licensing
 
-From the repo root, run coverage with `cd agent && npm run test:coverage`.
-Type-only file guardrail (local): `cd agent && npm run check:types-type-only`.
+We also offer commercial licenses for organizations that wish to:
 
-From `agent/`:
+* Use this software in proprietary systems
+* Avoid AGPL obligations
+* Embed or redistribute this software as part of a commercial offering
 
-```bash
-npm run test
-npm run test:watch
-npm run test:coverage
-```
+For commercial licensing inquiries, please contact the project owners.
 
-Coverage outputs (from `agent/`):
-
-- HTML report: `coverage/index.html` (open this in a browser)
-- LCOV file: `coverage/lcov.info` (for tooling/CI)
-
-VS Code coverage overlay:
-
-1. Install extension: `Coverage Gutters` (`ryanluker.vscode-coverage-gutters`)
-2. Run `npm run test:coverage`
-3. In VS Code Command Palette, run `Coverage Gutters: Display Coverage`
-4. If prompted for a file, choose `agent/coverage/lcov.info`
-
-Codecov note:
-
-- Public repos can usually upload without a token.
-- Private repos should set a `CODECOV_TOKEN` repository secret.
-
-## Repository layout
-
-This repo is a single Git repository with a service-style structure:
-
-* `agent/` — Next.js app (the primary UI/service)
-* `docker-compose.yml` — local orchestration for running the system
-* `artifacts/` — working area for generated outputs and local data (see notes below)
-* `.env` — local-only configuration (not committed)
-
-There is **no separate Git repo** under `agent/` (no nested `.git`).
-
-## Artifacts (local working area)
-
-`artifacts/` is intended as a practical workspace for outputs (exports, generated files, local datasets).
-
-By default, local outputs under `artifacts/` are **not committed** to Git (see root `.gitignore`).
-If you need to share something, prefer adding it under:
-
-* `artifacts/examples/` (small, safe samples)
-* `artifacts/templates/` (blank templates / schemas)
-
-For anything large or sensitive, attach it to the ticket/PR instead of committing it.
-
-
-## Docs
-
-See `docs/README.md` for the canonical documentation index.
-
+See the `LICENSE` file for full details.
