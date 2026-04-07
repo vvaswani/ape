@@ -1,0 +1,308 @@
+/* ==========================================================================
+   APE - globals.css (clean, class-driven)
+   --------------------------------------------------------------------------
+   Goal: simple, professional UI with minimal “global element” styling.
+   We avoid styling generic tags like `input`/`button` globally because it
+   causes unintended side-effects across components (and fights class styles).
+   ========================================================================== */
+
+/* 1) Predictable sizing everywhere:
+   Ensures padding/borders don’t unexpectedly change element widths. */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* 2) Design tokens (single source of truth):
+   Centralised colors + borders make it easy to tune the theme. */
+:root {
+  --bg: #0b1220;                 /* App background base */
+  --card: rgba(15, 23, 42, 0.85); /* Card surface */
+  --muted: #94a3b8;              /* Secondary text */
+  --text: #e2e8f0;               /* Primary text */
+  --border: rgba(148, 163, 184, 0.18); /* Subtle borders in dark mode */
+
+  --accent: #3b82f6;             /* Primary action */
+  --accent-2: #1d4ed8;           /* Primary action (deeper) */
+
+  --danger: #f87171;             /* Error highlight */
+  --danger-bg: rgba(248, 113, 113, 0.08);
+  --danger-border: rgba(248, 113, 113, 0.35);
+}
+
+/* 3) Full-height canvas:
+   Allows centered layouts and scroll areas to behave consistently. */
+html, body {
+  height: 100%;
+}
+
+/* 4) Base page styling:
+   Dark background + comfortable system font stack. */
+body {
+  margin: 0;
+  background: radial-gradient(1200px 600px at 50% 0%, #111c33 0%, var(--bg) 45%);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
+    Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  line-height: 1.45;
+}
+
+/* ==========================================================================
+   App layout
+   ========================================================================== */
+
+/* 5) Main layout wrapper:
+   Keeps content centered and readable on wide screens. */
+.app {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 40px 16px 60px;
+}
+
+/* 6) Header block:
+   Lightweight brand + subtitle (avoids a huge “demo” headline). */
+.app__header {
+  margin-bottom: 16px;
+}
+
+.app__brand {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.app__subtitle {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* 7) Card surface:
+   The primary container for the chat UI. */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+/* 8) Divider line:
+   Used between the transcript and composer for visual separation. */
+.divider {
+  height: 1px;
+  background: var(--border);
+}
+
+/* ==========================================================================
+   Chat transcript
+   ========================================================================== */
+
+/* 9) Chat container:
+   Adds consistent padding around transcript content. */
+.chat {
+  padding: 14px;
+}
+
+/* 10) Top bar:
+   Small hints + utility actions aligned cleanly. */
+.chat__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+}
+
+.chat__hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.chat__actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* 11) Error banner:
+   Clear feedback without screaming “red page”. */
+.chat__error {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
+  border-radius: 10px;
+  color: #fecaca;
+  font-size: 13px;
+}
+
+/* 12) Scroll region:
+   Keeps long conversations contained while preserving page layout. */
+.chat__scroll {
+  max-height: 60vh;
+  overflow: auto;
+  padding: 12px 2px 2px;
+  display: grid;
+  gap: 12px;
+
+  /* Small polish: thinner scrollbar in Firefox */
+  scrollbar-width: thin;
+}
+
+/* 13) Message block:
+   Meta label + bubble stack. */
+.msg {
+  display: grid;
+  gap: 6px;
+}
+
+.msg__meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* 14) Bubble:
+   Rounded, bordered bubble with readable line spacing. */
+.msg__bubble {
+  width: fit-content;
+  max-width: 720px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(2, 6, 23, 0.45);
+  white-space: pre-wrap;
+}
+
+/* 15) User message alignment:
+   Right-aligned with a subtle accent tint to distinguish. */
+.msg--user {
+  justify-items: end;
+}
+
+.msg--user .msg__bubble {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+/* 16) “Thinking…” state:
+   Slightly muted and italic so it reads as transient. */
+.msg__bubble--thinking {
+  opacity: 0.85;
+  font-style: italic;
+}
+
+/* ==========================================================================
+   Composer (input + send)
+   ========================================================================== */
+
+/* 17) Composer row:
+   Fixed-height control bar that feels like a proper chat app. */
+.composer {
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+  align-items: center;
+}
+
+/* 18) Input:
+   Styled via class (not `input {}` globally) to avoid side effects. */
+.composer__input {
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(2, 6, 23, 0.35);
+  color: var(--text);
+  outline: none;
+}
+
+.composer__input:focus {
+  border-color: rgba(59, 130, 246, 0.55);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
+/* ==========================================================================
+   Buttons (class-based)
+   ========================================================================== */
+
+/* 19) Base button:
+   Generic button style used for primary + ghost variants. */
+.btn {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* 20) Ghost button:
+   Subtle background for utility actions (Clear/Copy). */
+.btn--ghost {
+  background: rgba(2, 6, 23, 0.25);
+}
+
+/* 21) Primary button:
+   Stronger emphasis for the main action (Send). */
+.btn--primary {
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-2) 100%);
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+/* Optional: subtly distinguish assistant bubbles */
+.msg--assistant .msg__bubble {
+  background: rgba(2, 6, 23, 0.30);
+}
+
+
+/* Optional: better wrapping on narrow widths */
+.chat__actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Markdown typography inside chat bubbles */
+.msg__bubble :is(p) { margin: 0; }
+.msg__bubble :is(p + p) { margin-top: 10px; }
+
+.msg__bubble :is(ul, ol) { margin: 8px 0 0; padding-left: 18px; }
+.msg__bubble :is(li) { margin: 4px 0; }
+
+.msg__bubble :is(code) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.95em;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.55);
+}
+
+.msg__bubble pre {
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(2, 6, 23, 0.55);
+}
+
+.msg__bubble pre code {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+
+/* ==========================================================================
+   Notes
+   --------------------------------------------------------------------------
+   - Intentionally no global `input`, `button`, `form`, or `h1` styling.
+     Those “convenience” rules always end up breaking component-level styling.
+   - If you still have legacy `.container` markup somewhere, migrate it to `.app`
+     instead of keeping two layout systems.
+   ========================================================================== */

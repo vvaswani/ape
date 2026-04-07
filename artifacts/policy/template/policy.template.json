@@ -1,0 +1,74 @@
+{
+  "policy_id": "ape-policy",
+  "policy_name": "AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator) Policy",
+  "policy_version": "__VERSION__",
+  "source": "template",
+  "jurisdiction": "__JURISDICTION__",
+  "owner": "__OWNER__",
+  "updated_at": "__YYYY-MM-DD__",
+
+  "strategic_asset_allocation": {
+    "base_currency": "__BASE_CURRENCY__",
+    "asset_classes": [
+      "EQUITIES",
+      "BONDS",
+      "CASH"
+    ],
+    "target_weights": {
+      "EQUITIES": "__0.00__",
+      "BONDS": "__0.00__",
+      "CASH": "__0.00__"
+    }
+  },
+
+  "risk_guardrails": {
+    "max_rolling_12m_drawdown_pct": "__0.00__",
+    "risk_capacity_rule": "RISK_CAPACITY_OVERRIDES_TOLERANCE"
+  },
+
+  "rebalancing_policy": {
+    "trigger_type": "BAND_ABSOLUTE",
+    "absolute_bands": {
+      "EQUITIES": "__0.00__",
+      "BONDS": "__0.00__",
+      "CASH": "__0.00__"
+    },
+    "review_cadence": {
+      "light_check": "MONTHLY",
+      "formal_review": "QUARTERLY"
+    },
+    "execution_preferences": {
+      "use_contributions_first": true,
+      "sell_only_if_required": true,
+      "avoid_micro_trades": true
+    }
+  },
+
+  "turnover_controls": {
+    "min_trade_gbp": "__INTEGER__",
+    "min_trade_pct_of_portfolio": "__0.00__",
+    "notes": "__OPTIONAL__"
+  },
+
+  "constraints": {
+    "prohibited_actions": [
+      "LEVERAGE",
+      "MARGIN",
+      "MARKET_TIMING",
+      "CONCENTRATED_SINGLE_SECURITY",
+      "SILENT_POLICY_CHANGE"
+    ],
+    "wrappers_supported": [
+      "ISA",
+      "SIPP",
+      "GIA",
+      "TRUST",
+      "OTHER"
+    ]
+  },
+
+  "meta": {
+    "derived_from_guidelines_version": "__GUIDELINES_VERSION__",
+    "notes": "Template only. Not intended for runtime execution."
+  }
+}

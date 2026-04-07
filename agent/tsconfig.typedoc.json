@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["lib/domain/**/*.ts"],
+  "exclude": ["**/*.test.ts", "test/**", "app/**", "components/**", "lib/infra/**", "lib/services/**"]
+}

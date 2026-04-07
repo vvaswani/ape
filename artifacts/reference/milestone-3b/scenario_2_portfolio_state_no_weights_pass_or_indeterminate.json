@@ -1,0 +1,120 @@
+{
+  "snapshot_id": "00000000-0000-0000-0000-000000000001",
+  "snapshot_version": "0.3",
+  "created_at": "2026-02-07T00:00:00Z",
+  "project": "AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator)",
+  "outcome_state": "CANNOT_DECIDE_MISSING_INPUTS",
+  "inputs_observed": [
+    { "input_key": "portfolio_state.weights", "value": "provided", "source": "form" },
+    { "input_key": "portfolio_state.cash_flows", "value": "provided", "source": "form" }
+  ],
+  "inputs_missing": [
+    { "input_key": "portfolio_state.cash_flows", "impact": "Required to assess cashflow-driven rebalancing." },
+    { "input_key": "portfolio_state.total_value", "impact": "Required for sizing and validation." }
+  ],
+  "policy_items_referenced": [
+    { "dpq_id": "DPQ-001" },
+    { "dpq_id": "DPQ-004" }
+  ],
+  "warnings": [
+    { "code": "DRIFT_CANNOT_COMPUTE", "message": "Portfolio state provided but drift could not be computed." }
+  ],
+  "errors": [],
+  "context": {
+    "user_id": "sample",
+    "environment": "reference",
+    "jurisdiction": "UK",
+    "base_currency": "GBP"
+  },
+  "inputs": {
+    "portfolio_state": {
+      "total_value": null,
+      "asset_allocation": { "EQUITIES": null, "BONDS": null, "CASH": null },
+      "positions_summary": "Structured portfolio state provided (manual input).",
+      "cash_balance": null
+    },
+    "cash_flows": {
+      "pending_contributions": null,
+      "pending_withdrawals": null,
+      "notes": "Not provided."
+    },
+    "constraints": {
+      "liquidity_needs": "Not captured yet.",
+      "tax_or_wrapper_constraints": "Not captured yet.",
+      "other_constraints": "Not captured yet."
+    },
+    "market_context": {
+      "as_of_date": "2026-02-07",
+      "notes": "No exceptional market context assumed."
+    }
+  },
+  "governance": {
+    "investment_policy": {
+      "policy_id": "ape-policy",
+      "policy_version": "0.1-default",
+      "policy_source": "default"
+    },
+    "explanation_contract": { "version": "0.1-default" }
+  },
+  "evaluation": {
+    "policy_applied": {
+      "targets": { "EQUITIES": 0.8, "BONDS": 0.15, "CASH": 0.05 },
+      "bands": { "EQUITIES": 0.05, "BONDS": 0.04, "CASH": 0.02 },
+      "risk_guardrails_used": ["DPQ-004"],
+      "evaluated_policies": ["DPQ-001", "DPQ-004"],
+      "skipped_policies": [
+        { "dpq_id": "DPQ-002", "reason": "DRIFT_CANNOT_COMPUTE" },
+        { "dpq_id": "DPQ-003", "reason": "MISSING_INPUTS" }
+      ],
+      "status": "partial",
+      "reason_codes": ["DRIFT_CANNOT_COMPUTE", "MISSING_INPUTS"],
+      "blocking_inputs": ["portfolio_state.cash_flows", "portfolio_state.total_value"]
+    },
+    "correctness": {
+      "status": "indeterminate",
+      "checks_run": ["AUTHORITY_CHECK", "RISK_GUARDRAILS", "DRIFT_EVALUATION", "CONTRADICTION_CHECK"],
+      "failed_checks": ["DRIFT_CANNOT_COMPUTE"]
+    },
+    "drift": { "status": "cannot_compute" },
+    "drift_analysis": {
+      "target_weights": { "EQUITIES": 0.8, "BONDS": 0.15, "CASH": 0.05 },
+      "actual_weights": { "EQUITIES": null, "BONDS": null, "CASH": null },
+      "absolute_drift": { "EQUITIES": null, "BONDS": null, "CASH": null },
+      "bands_breached": null
+    },
+    "risk_checks": {
+      "drawdown_proximity": "Not evaluated.",
+      "risk_capacity_breached": null,
+      "notes": "Risk guardrails evaluated with missing inputs."
+    }
+  },
+  "recommendation": {
+    "type": "DEFER_AND_REVIEW",
+    "summary": "Defer and review required before proceeding.",
+    "proposed_actions": [],
+    "turnover_estimate": { "gross_turnover_pct": null, "trade_count": 0 }
+  },
+  "explanation": {
+    "decision_summary": "Portfolio state was provided but drift could not be computed.",
+    "relevant_portfolio_state": "Portfolio state present but incomplete for drift computation.",
+    "policy_basis": "Policy requires deterministic drift before action.",
+    "reasoning_and_tradeoffs": "Cannot safely recommend without complete deterministic inputs.",
+    "uncertainty_and_confidence": "High uncertainty due to missing inputs.",
+    "next_review_or_trigger": "Provide required inputs and retry."
+  },
+  "user_acknowledgement": {
+    "decision": "DEFER",
+    "user_notes": "Reference snapshot.",
+    "acknowledged_at": null
+  },
+  "outcome": {
+    "implemented": null,
+    "implementation_notes": null,
+    "review_date": null,
+    "observed_effects": null
+  },
+  "audit": {
+    "logic_version": "0.3",
+    "notes": "Reference snapshot for Milestone 3b (portfolio_state provided, drift not computed)."
+  }
+}

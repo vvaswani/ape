@@ -1,0 +1,125 @@
+{
+  "snapshot_id": "__UUID__",
+  "snapshot_version": "__VERSION__",
+  "created_at": "__YYYY-MM-DDTHH:MM:SSZ__",
+
+  "project": "AI Portfolio Decision Co-Pilot (Automated Portfolio Evaluator)",
+
+  "context": {
+    "user_id": "__USER_ID__",
+    "environment": "__ENVIRONMENT__",
+    "jurisdiction": "__JURISDICTION__",
+    "base_currency": "__BASE_CURRENCY__"
+  },
+
+  "inputs": {
+    "portfolio_state": {
+      "total_value": "__NUMBER__",
+      "asset_allocation": {
+        "EQUITIES": "__0.00__",
+        "BONDS": "__0.00__",
+        "CASH": "__0.00__"
+      },
+      "positions_summary": "__OPTIONAL_SUMMARY__",
+      "cash_balance": "__NUMBER__"
+    },
+
+    "cash_flows": {
+      "pending_contributions": "__NUMBER__",
+      "pending_withdrawals": "__NUMBER__",
+      "notes": "__OPTIONAL__"
+    },
+
+    "constraints": {
+      "liquidity_needs": "__OPTIONAL__",
+      "tax_or_wrapper_constraints": "__OPTIONAL__",
+      "other_constraints": "__OPTIONAL__"
+    },
+
+    "market_context": {
+      "as_of_date": "__YYYY-MM-DD__",
+      "notes": "__OPTIONAL_CONTEXT_ONLY__"
+    }
+  },
+
+  "governance": {
+    "investment_policy": {
+      "policy_id": "__POLICY_ID__",
+      "policy_version": "__POLICY_VERSION__",
+      "policy_source": "__default_or_local__"
+    },
+    "explanation_contract": {
+      "version": "__EXPLANATION_CONTRACT_VERSION__"
+    }
+  },
+
+  "evaluation": {
+    "drift_analysis": {
+      "target_weights": {
+        "EQUITIES": "__0.00__",
+        "BONDS": "__0.00__",
+        "CASH": "__0.00__"
+      },
+      "actual_weights": {
+        "EQUITIES": "__0.00__",
+        "BONDS": "__0.00__",
+        "CASH": "__0.00__"
+      },
+      "absolute_drift": {
+        "EQUITIES": "__0.00__",
+        "BONDS": "__0.00__",
+        "CASH": "__0.00__"
+      },
+      "bands_breached": "__true_or_false__"
+    },
+
+    "risk_checks": {
+      "drawdown_proximity": "__OPTIONAL__",
+      "risk_capacity_breached": "__true_or_false__",
+      "notes": "__OPTIONAL__"
+    }
+  },
+
+  "recommendation": {
+    "type": "__RECOMMENDATION_TYPE__",
+    "summary": "__ONE_LINE_SUMMARY__",
+
+    "proposed_actions": [
+      {
+        "asset_class": "__EQUITIES_BONDS_CASH__",
+        "action": "__BUY_SELL_HOLD__",
+        "amount": "__NUMBER__",
+        "rationale": "__SHORT_REASON__"
+      }
+    ],
+
+    "turnover_estimate": {
+      "gross_turnover_pct": "__0.00__",
+      "trade_count": "__INTEGER__"
+    }
+  },
+
+  "explanation": {
+    "decision_summary": "__TEXT__",
+    "relevant_portfolio_state": "__TEXT__",
+    "policy_basis": "__TEXT__",
+    "reasoning_and_tradeoffs": "__TEXT__",
+    "uncertainty_and_confidence": "__TEXT__",
+    "next_review_or_trigger": "__TEXT__"
+  },
+
+  "user_acknowledgement": {
+    "decision": "__ACCEPT_DEFER_IGNORE__",
+    "user_notes": "__OPTIONAL__",
+    "acknowledged_at": "__OPTIONAL_TIMESTAMP__"
+  },
+
+  "outcome": {
+    "implemented": "__true_false_or_null__",
+    "implementation_notes": "__OPTIONAL__",
+    "review_date": "__OPTIONAL_FUTURE_DATE__",
+    "observed_effects": "__OPTIONAL__"
+  },
+
+  "audit": {
+    "logic_ver_

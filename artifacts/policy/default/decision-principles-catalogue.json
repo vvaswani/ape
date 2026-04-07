@@ -1,0 +1,103 @@
+{
+  "metadata": {
+    "schema_version": "0.1.0",
+    "catalogue_version": "0.1.0",
+    "generated_at": "2026-02-07T00:00:00Z",
+    "changelog": [
+      {
+        "version": "0.1.0",
+        "date": "2026-02-07",
+        "notes": "Initial catalogue with baseline decision questions and condition lists."
+      }
+    ]
+  },
+  "principles": [
+    {
+      "question_id": "DPQ-001",
+      "question_text": "Is any portfolio action permitted under current authority?",
+      "required_inputs": [
+        "authority.actor_role",
+        "authority.decision_intent"
+      ],
+      "rationale": "Authority context governs whether an action is permitted.",
+      "inaction_conditions": [
+        { "id": "IC-001", "description": "Actor role is not authorized for any action." },
+        { "id": "IC-002", "description": "Decision intent is ADVISE only and action requires APPROVE or EXECUTE." }
+      ],
+      "mandatory_action_conditions": [
+        { "id": "MAC-001", "description": "None (no action required purely by authority context)." }
+      ],
+      "ipm_mapping": {
+        "ipm_section_heading": "Authority and Change Control",
+        "ipm_field_key": "authority.change_control",
+        "ipm_clause_id": "IPM-ACC-001"
+      }
+    },
+    {
+      "question_id": "DPQ-002",
+      "question_text": "Is the portfolio drift out of allowed bands?",
+      "required_inputs": [
+        "portfolio_state.weights",
+        "policy.strategic_asset_allocation.target_weights",
+        "policy.rebalancing_policy.absolute_bands"
+      ],
+      "rationale": "Drift relative to policy bands determines whether rebalancing is required.",
+      "inaction_conditions": [
+        { "id": "IC-003", "description": "All asset-class drift values are within bands." },
+        { "id": "IC-004", "description": "Portfolio state is missing or incomplete." }
+      ],
+      "mandatory_action_conditions": [
+        { "id": "MAC-002", "description": "Any asset-class drift breaches its allowed band and a rebalance is permitted." }
+      ],
+      "ipm_mapping": {
+        "ipm_section_heading": "Rebalancing Philosophy",
+        "ipm_field_key": "rebalancing.philosophy",
+        "ipm_clause_id": "IPM-RBP-001"
+      }
+    },
+    {
+      "question_id": "DPQ-003",
+      "question_text": "Are there pending cash flows that require contribution-based rebalancing?",
+      "required_inputs": [
+        "portfolio_state.cash_flows",
+        "portfolio_state.weights",
+        "policy.rebalancing_policy.absolute_bands"
+      ],
+      "rationale": "Pending contributions can be used to restore target weights without selling.",
+      "inaction_conditions": [
+        { "id": "IC-005", "description": "No pending contributions or withdrawals." },
+        { "id": "IC-006", "description": "Portfolio state is missing or incomplete." }
+      ],
+      "mandatory_action_conditions": [
+        { "id": "MAC-003", "description": "Pending contributions exist and drift is out of band; use contribution-based rebalance." }
+      ],
+      "ipm_mapping": {
+        "ipm_section_heading": "Strategic Asset Allocation (SAA)",
+        "ipm_field_key": "saa.target_weights",
+        "ipm_clause_id": "IPM-SAA-002"
+      }
+    },
+    {
+      "question_id": "DPQ-004",
+      "question_text": "Are risk guardrails breached?",
+      "required_inputs": [
+        "risk_inputs.rolling_12m_drawdown_pct",
+        "risk_inputs.risk_capacity_breached",
+        "policy.risk_framework.drawdown_limit"
+      ],
+      "rationale": "Risk limits and drawdown thresholds can force deferral or review.",
+      "inaction_conditions": [
+        { "id": "IC-007", "description": "Risk inputs are missing." }
+      ],
+      "mandatory_action_conditions": [
+        { "id": "MAC-004", "description": "Risk capacity breach is true." },
+        { "id": "MAC-005", "description": "Rolling drawdown exceeds policy limit." }
+      ],
+      "ipm_mapping": {
+        "ipm_section_heading": "Risk Framework",
+        "ipm_field_key": "risk.drawdown_limit",
+        "ipm_clause_id": "IPM-RSK-003"
+      }
+    }
+  ]
+}

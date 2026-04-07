@@ -1,0 +1,79 @@
+name: Commit Prefix Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  branch-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce branch naming convention
+        shell: bash
+        run: |
+          branch="${{ github.head_ref }}"
+          regex='^(feat|fix|chore|docs|refactor|test|ci|build|perf|style|hotfix)/APE-?[0-9]{1,3}-[a-z0-9][a-z0-9-]*$'
+
+          echo "Validating branch: $branch"
+          echo "$branch" | grep -Eq "$regex" || {
+            printf '%s\n' \
+              "Branch name is invalid." \
+              "" \
+              "Required format:" \
+              "  <type>/APE<id>-<description>" \
+              "  <type>/APE-<id>-<description>" \
+              "" \
+              "Rules:" \
+              "  - <type> must be one of: feat, fix, chore, docs, refactor, test, ci, build, perf, style, hotfix" \
+              "  - <id> must be 1 to 3 digits" \
+              "  - <description> must be lowercase kebab-case" \
+              "" \
+              "Examples:" \
+              "  feat/APE1-plane-sync" \
+              "  chore/APE-11-update-workflow" \
+              "  docs/APE-111-add-setup-guide"
+            exit 1
+          }
+
+  commit-prefix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Enforce Plane key in subject on code commits
+        shell: bash
+        run: |
+          base="${{ github.base_ref }}"
+          git fetch origin "$base":"origin/$base"
+          regex='(^|[^A-Za-z0-9])(APE-[0-9]+)($|[^A-Za-z0-9])'
+          fail=0
+
+          while read -r sha; do
+            subject="$(git log -1 --format=%s "$sha")"
+            case "$subject" in
+              Merge\ *|Revert\ *)
+                continue
+                ;;
+            esac
+
+            code=0
+            while read -r file; do
+              case "$file" in
+                docs/*) ;;
+                *.md) ;;
+                src/*|app/*|pages/*|lib/*|server/*|api/*|packages/*|prisma/*|migrations/*) code=1 ;;
+                *.ts|*.tsx|*.js|*.jsx) code=1 ;;
+                *) ;;
+              esac
+            done < <(git show --name-only --pretty=format: "$sha")
+
+            if [ "$code" -eq 1 ]; then
+              echo "$subject" | grep -Eq "$regex" || {
+                echo "Missing Plane key in commit subject $sha: $subject"
+                fail=1
+              }
+            fi
+          done < <(git rev-list "origin/$base"..HEAD)
+
+          exit $fail
